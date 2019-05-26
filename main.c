@@ -94,7 +94,7 @@ APP_TIMER_DEF(m_repeated_timer_id); // RTC timer variable initialization. FOR DE
 
 
 
-#define ADV_TIMEOUT 1000
+#define ADV_TIMEOUT 500
 
 static ble_gap_adv_params_t m_adv_params;                                  /**< Parameters to be passed to the stack when starting advertising. */
 static uint8_t              m_adv_handle = BLE_GAP_ADV_SET_HANDLE_NOT_SET; /**< Advertising handle used to identify an advertising set. */
@@ -321,9 +321,9 @@ static void idle_state_handle(void)
     if (NRF_LOG_PROCESS() == false)
     {
 				uint32_t err_code;
-        nrf_pwr_mgmt_run();
-				//err_code = sd_app_evt_wait();
-				//APP_ERROR_CHECK(err_code);
+        //nrf_pwr_mgmt_run();
+				err_code = sd_app_evt_wait();
+				APP_ERROR_CHECK(err_code);
 
     }
 		else
@@ -358,7 +358,6 @@ static void repeated_timer_create()
                                 APP_TIMER_MODE_REPEATED,
                                 repeated_timer_handler);
 	APP_ERROR_CHECK(err_code);
-	//advertising_start();
 	app_timer_start(m_oneshot_timer_id,APP_TIMER_TICKS(500),NULL);
 }
 
@@ -388,7 +387,7 @@ int main(void)
 		repeated_timer_create();
 		//app_timer_start(m_repeated_timer_id,APP_TIMER_TICKS(2000),NULL);
 		advertising_start();
-		app_timer_start(m_repeated_timer_id,APP_TIMER_TICKS(10000),NULL);
+		app_timer_start(m_repeated_timer_id,APP_TIMER_TICKS(5000),NULL);
 		for(;;)
 		{
 			idle_state_handle();
