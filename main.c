@@ -63,6 +63,23 @@
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
 
+// SAADC
+#include "nrfx_saadc.h"
+#include "nrfx_ppi.h"
+#include "nrfx.h"
+#include "nrfx_timer.h"
+#include "boards.h"
+#include "app_error.h"
+#include "nrf_delay.h"
+#include "app_util_platform.h"
+
+#define SAMPLES_IN_BUFFER 5
+volatile uint8_t state = 1;
+
+nrfx_timer_t timer = NRFX_TIMER_INSTANCE(1);
+static nrf_saadc_value_t     m_buffer_pool[2][SAMPLES_IN_BUFFER];
+static nrf_ppi_channel_t     m_ppi_channel;
+static uint32_t              m_adc_evt_counter;
 
 #define APP_BLE_CONN_CFG_TAG            1                                  /**< A tag identifying the SoftDevice BLE configuration. */
 
@@ -92,6 +109,9 @@ APP_TIMER_DEF(m_ble_timeout_timer_id); // RTC timer variable initialization
 APP_TIMER_DEF(m_repeated_timer_id); // RTC timer variable initialization. FOR DEBUGGING
 
 
+/*SAADC*/
+
+// SAADC END
 
 
 #define ADV_TIMEOUT 500
