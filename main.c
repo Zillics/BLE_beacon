@@ -488,7 +488,8 @@ void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
  */
 int main(void)
 {
-    // INITIALIZE
+/*
+		// INITIALIZE
     log_init();
     timers_init();
     leds_init();
@@ -505,6 +506,25 @@ int main(void)
 		{
 			idle_state_handle();
 		}
+	*/
+		uint32_t err_code = NRF_LOG_INIT(NULL);
+    APP_ERROR_CHECK(err_code);
+
+    NRF_LOG_DEFAULT_BACKENDS_INIT();
+
+    ret_code_t ret_code = nrf_pwr_mgmt_init();
+    APP_ERROR_CHECK(ret_code);
+
+    saadc_init();
+    saadc_sampling_event_init();
+    saadc_sampling_event_enable();
+    NRF_LOG_INFO("SAADC HAL simple example started.");
+
+    while (1)
+    {
+        nrf_pwr_mgmt_run();
+        NRF_LOG_FLUSH();
+    }
 }
 
 
