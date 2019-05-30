@@ -74,7 +74,7 @@
 #include "nrf_delay.h"
 #include "app_util_platform.h"
 
-#define SAMPLES_IN_BUFFER 5
+#define SAMPLES_IN_BUFFER 1
 volatile uint8_t state = 1;
 
 static const nrfx_timer_t m_timer = NRFX_TIMER_INSTANCE(1);
@@ -131,7 +131,7 @@ void saadc_sampling_event_init(void)
     APP_ERROR_CHECK(err_code);
 
     /* setup m_timer for compare event every 400ms */
-    uint32_t ticks = nrfx_timer_ms_to_ticks(&m_timer, 400);
+    uint32_t ticks = nrfx_timer_ms_to_ticks(&m_timer, 500);
     nrfx_timer_extended_compare(&m_timer,
                                    NRF_TIMER_CC_CHANNEL0,
                                    ticks,
@@ -180,6 +180,7 @@ void saadc_callback(nrfx_saadc_evt_t const * p_event)
         }
         m_adc_evt_counter++;
     }
+		nrf_drv_gpiote_out_toggle(LED_3);
 }
 
 
@@ -507,6 +508,7 @@ int main(void)
 			idle_state_handle();
 		}
 	*/
+		leds_init();
 		uint32_t err_code = NRF_LOG_INIT(NULL);
     APP_ERROR_CHECK(err_code);
 
@@ -514,7 +516,7 @@ int main(void)
 
     ret_code_t ret_code = nrf_pwr_mgmt_init();
     APP_ERROR_CHECK(ret_code);
-
+	
     saadc_init();
     saadc_sampling_event_init();
     saadc_sampling_event_enable();
