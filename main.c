@@ -112,6 +112,8 @@ APP_TIMER_DEF(m_repeated_timer_id); // RTC timer variable initialization. FOR DE
 
 /*SAADC*/
 
+static void advertising_start(void);
+
 void timer_handler(nrf_timer_event_t event_type, void * p_context)
 {
 
@@ -131,7 +133,7 @@ void saadc_sampling_event_init(void)
     APP_ERROR_CHECK(err_code);
 
     /* setup m_timer for compare event every 400ms */
-    uint32_t ticks = nrfx_timer_ms_to_ticks(&m_timer, 500);
+    uint32_t ticks = nrfx_timer_ms_to_ticks(&m_timer, 200);
     nrfx_timer_extended_compare(&m_timer,
                                    NRF_TIMER_CC_CHANNEL0,
                                    ticks,
@@ -181,6 +183,7 @@ void saadc_callback(nrfx_saadc_evt_t const * p_event)
         m_adc_evt_counter++;
     }
 		nrf_drv_gpiote_out_toggle(LED_3);
+		//advertising_start();
 }
 
 
@@ -208,7 +211,7 @@ void saadc_init(void)
 // SAADC END
 
 
-#define ADV_TIMEOUT 500
+#define ADV_TIMEOUT 400
 
 static ble_gap_adv_params_t m_adv_params;                                  /**< Parameters to be passed to the stack when starting advertising. */
 static uint8_t              m_adv_handle = BLE_GAP_ADV_SET_HANDLE_NOT_SET; /**< Advertising handle used to identify an advertising set. */
@@ -337,7 +340,7 @@ static void advertising_start(void)
     err_code = sd_ble_gap_adv_start(m_adv_handle, APP_BLE_CONN_CFG_TAG);
     APP_ERROR_CHECK(err_code);
 
-    //err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING);
+    err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING);
     APP_ERROR_CHECK(err_code);
 }
 
@@ -398,6 +401,7 @@ static void log_init(void)
     APP_ERROR_CHECK(err_code);
 
     NRF_LOG_DEFAULT_BACKENDS_INIT();
+	
 }
 
 /**@brief Function for initializing LEDs. */
@@ -509,14 +513,10 @@ int main(void)
 		}
 	*/
 		leds_init();
-		uint32_t err_code = NRF_LOG_INIT(NULL);
-    APP_ERROR_CHECK(err_code);
-
-    NRF_LOG_DEFAULT_BACKENDS_INIT();
-
-    ret_code_t ret_code = nrf_pwr_mgmt_init();
-    APP_ERROR_CHECK(ret_code);
-	
+		log_init();
+		power_management_init();
+		ble_stack_init();
+		advertising_init();
     saadc_init();
     saadc_sampling_event_init();
     saadc_sampling_event_enable();
