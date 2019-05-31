@@ -150,6 +150,21 @@ static uint8_t m_beacon_info[APP_BEACON_INFO_LENGTH] =                    /**< I
                          // this implementation.
 };
 
+#define MOISTURE_DATA_LENGTH 2
+static uint8_t m_moisture_level[MOISTURE_DATA_LENGTH] = 
+{
+		0x00,
+		0x00
+};
+
+// Converts a 16-bit value to an array of two 8-bit values and places it in dest
+static void convert16to8(uint16_t src, uint8_t * dest)
+{
+	//NRF_LOG_INFO("CONVERTING %d .....",src);
+	dest[0] = (uint8_t) (src >> 8);
+	dest[1] = (uint8_t) (src);
+	//NRF_LOG_INFO("...TO [%d , %d]",dest[0],dest[1]);
+}
 
 /**@brief Callback function for asserts in the SoftDevice.
  *
@@ -204,8 +219,8 @@ static void advertising_init(void)
     m_beacon_info[index++] = LSB_16(minor_value);
 #endif
 
-    manuf_specific_data.data.p_data = (uint8_t *) m_beacon_info;
-    manuf_specific_data.data.size   = APP_BEACON_INFO_LENGTH;
+    manuf_specific_data.data.p_data = (uint8_t *) m_moisture_level;
+    manuf_specific_data.data.size   = MOISTURE_DATA_LENGTH;//APP_BEACON_INFO_LENGTH;
 
     // Build and set advertising data.
     memset(&advdata, 0, sizeof(advdata));
@@ -238,8 +253,8 @@ static void advertising_start(void)
     ret_code_t err_code;
     err_code = sd_ble_gap_adv_start(m_adv_handle, APP_BLE_CONN_CFG_TAG);
 		APP_ERROR_CHECK(err_code);
-    err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING);
-    APP_ERROR_CHECK(err_code);
+    //err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING);
+    //APP_ERROR_CHECK(err_code);
 }
 
 static void advertising_stop(void)
@@ -315,7 +330,7 @@ void saadc_sampling_event_init(void)
     timer_cfg.bit_width = NRF_TIMER_BIT_WIDTH_32;
     err_code = nrfx_timer_init(&m_timer, &timer_cfg, timer_handler);
     APP_ERROR_CHECK(err_code);
-    uint32_t ticks = nrfx_timer_ms_to_ticks(&m_timer, 5000);
+    uint32_t ticks = nrfx_timer_ms_to_ticks(&m_timer, 6000);
     nrfx_timer_extended_compare(&m_timer,
                                    NRF_TIMER_CC_CHANNEL0,
                                    ticks,
@@ -361,13 +376,15 @@ void saadc_callback(nrfx_saadc_evt_t const * p_event)
         NRF_LOG_INFO("ADC event number: %d", (int)m_adc_evt_counter);
 
         for (i = 0; i < SAMPLES_IN_BUFFER; i++)
-        {
+        {			 
+						convert16to8((uint16_t)p_event->data.done.p_buffer[i], m_moisture_level);
             NRF_LOG_INFO("%d", p_event->data.done.p_buffer[i]);
         }
         m_adc_evt_counter++;
     }
 		nrf_drv_gpiote_out_toggle(LED_3);
 		
+		advertising_init();
 		advertising_start();
 }
 
