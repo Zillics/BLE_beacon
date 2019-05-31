@@ -313,11 +313,11 @@ void saadc_sampling_event_init(void)
     err_code = nrf_drv_ppi_init();
     APP_ERROR_CHECK(err_code);
 
+		// TIMER SETUP
     nrfx_timer_config_t timer_cfg = NRFX_TIMER_DEFAULT_CONFIG;
     timer_cfg.bit_width = NRF_TIMER_BIT_WIDTH_32;
     err_code = nrfx_timer_init(&m_timer, &timer_cfg, timer_handler);
     APP_ERROR_CHECK(err_code);
-
     /* setup m_timer for compare event every 400ms */
     uint32_t ticks = nrfx_timer_ms_to_ticks(&m_timer, 200);
     nrfx_timer_extended_compare(&m_timer,
@@ -326,15 +326,17 @@ void saadc_sampling_event_init(void)
                                    NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK,
                                    false);
     nrfx_timer_enable(&m_timer);
-
+		// 
     uint32_t timer_compare_event_addr = nrfx_timer_compare_event_address_get(&m_timer,
                                                                                 NRF_TIMER_CC_CHANNEL0);
+		//uint32_t timer_compare_event_addr = nrfx_rtc_event_address_get	(&m_timer ,NRF_RTC_EVENT_COMPARE_0)
+		
     uint32_t saadc_sample_task_addr   = nrfx_saadc_sample_task_get();
 
     /* setup ppi channel so that timer compare event is triggering sample task in SAADC */
     err_code = nrfx_ppi_channel_alloc(&m_ppi_channel);
     APP_ERROR_CHECK(err_code);
-
+		// nrfx_ppi_channel_assign(ppi_channel, event_endpoint_addr, task_endpoint_addr)
     err_code = nrfx_ppi_channel_assign(m_ppi_channel,
                                           timer_compare_event_addr,
                                           saadc_sample_task_addr);
@@ -376,22 +378,36 @@ void saadc_callback(nrfx_saadc_evt_t const * p_event)
 
 void saadc_init(void)
 {
-    ret_code_t err_code;
-    nrf_saadc_channel_config_t channel_config =
-        NRFX_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN0);
+		ret_code_t err_code;
+		
+		nrfx_saadc_config_t saadc_config;
+		saadc_config.resolution = NRF_SAADC_RESOLUTION_12BIT;                                 
+		saadc_config.oversample = NRF_SAADC_OVERSAMPLE_8X;
+		saadc_config.interrupt_priority = APP_IRQ_PRIORITY_LOW;
+		saadc_config.low_power_mode = true;
 
-    err_code = nrfx_saadc_init(NULL, saadc_callback);
-    APP_ERROR_CHECK(err_code);
+		nrf_saadc_channel_config_t channel_config; //= NRFX_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN0);
+    channel_config.resistor_p = NRF_SAADC_RESISTOR_DISABLED;
+    channel_config.resistor_n = NRF_SAADC_RESISTOR_DISABLED;
+    channel_config.gain       = NRF_SAADC_GAIN1_6;
+    channel_config.reference  = NRF_SAADC_REFERENCE_INTERNAL;
+    channel_config.acq_time   = NRF_SAADC_ACQTIME_10US;
+    channel_config.mode       = NRF_SAADC_MODE_SINGLE_ENDED;
+		channel_config.burst      = NRF_SAADC_BURST_ENABLED; // If ON: Executes all Oversample times as quickly as possible on each activation
+    channel_config.pin_p      = NRF_SAADC_INPUT_AIN0;
+    channel_config.pin_n      = NRF_SAADC_INPUT_DISABLED;
+		
+		err_code = nrfx_saadc_init(&saadc_config, saadc_callback);
+		APP_ERROR_CHECK(err_code);
 
-    err_code = nrfx_saadc_channel_init(0, &channel_config);
-    APP_ERROR_CHECK(err_code);
+		err_code = nrfx_saadc_channel_init(0, &channel_config);
+		APP_ERROR_CHECK(err_code);
 
-    err_code = nrfx_saadc_buffer_convert(m_buffer_pool[0], SAMPLES_IN_BUFFER);
-    APP_ERROR_CHECK(err_code);
+		err_code = nrfx_saadc_buffer_convert(m_buffer_pool[0], SAMPLES_IN_BUFFER);
+		APP_ERROR_CHECK(err_code);
 
-    err_code = nrfx_saadc_buffer_convert(m_buffer_pool[1], SAMPLES_IN_BUFFER);
-    APP_ERROR_CHECK(err_code);
-
+		err_code = nrfx_saadc_buffer_convert(m_buffer_pool[1], SAMPLES_IN_BUFFER); // "Extra" buffer to write to when buffer 1 is full
+		APP_ERROR_CHECK(err_code);
 }
 
 
