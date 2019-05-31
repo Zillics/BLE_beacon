@@ -63,6 +63,24 @@
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
 
+// SAADC
+#include "nrfx_saadc.h"
+#include "nrfx_ppi.h"
+#include "nrf_drv_ppi.h"
+#include "nrfx.h"
+#include "nrfx_timer.h"
+#include "boards.h"
+#include "app_error.h"
+#include "nrf_delay.h"
+#include "app_util_platform.h"
+
+#define SAMPLES_IN_BUFFER 1
+volatile uint8_t state = 1;
+
+static const nrfx_timer_t m_timer = NRFX_TIMER_INSTANCE(1);
+static nrf_saadc_value_t     m_buffer_pool[2][SAMPLES_IN_BUFFER];
+static nrf_ppi_channel_t     m_ppi_channel;
+static uint32_t              m_adc_evt_counter;
 
 #define APP_BLE_CONN_CFG_TAG            1                                  /**< A tag identifying the SoftDevice BLE configuration. */
 
@@ -91,10 +109,9 @@ APP_TIMER_DEF(m_oneshot_timer_id); // RTC timer variable initialization
 APP_TIMER_DEF(m_ble_timeout_timer_id); // RTC timer variable initialization
 APP_TIMER_DEF(m_repeated_timer_id); // RTC timer variable initialization. FOR DEBUGGING
 
+/* BLE */
 
-
-
-#define ADV_TIMEOUT 500
+#define ADV_TIMEOUT 400
 
 static ble_gap_adv_params_t m_adv_params;                                  /**< Parameters to be passed to the stack when starting advertising. */
 static uint8_t              m_adv_handle = BLE_GAP_ADV_SET_HANDLE_NOT_SET; /**< Advertising handle used to identify an advertising set. */
@@ -219,11 +236,9 @@ static void advertising_init(void)
 static void advertising_start(void)
 {
     ret_code_t err_code;
-
     err_code = sd_ble_gap_adv_start(m_adv_handle, APP_BLE_CONN_CFG_TAG);
-    APP_ERROR_CHECK(err_code);
-
-    //err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING);
+		APP_ERROR_CHECK(err_code);
+    err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING);
     APP_ERROR_CHECK(err_code);
 }
 
@@ -276,6 +291,124 @@ static void ble_stack_init(void)
 }
 
 
+/* BLE end */
+
+
+/*SAADC*/
+
+
+void timer_handler(nrf_timer_event_t event_type, void * p_context)
+{
+
+}
+
+
+void saadc_sampling_event_init(void)
+{
+    ret_code_t err_code;
+
+    err_code = nrf_drv_ppi_init();
+    APP_ERROR_CHECK(err_code);
+
+		// TIMER SETUP
+    nrfx_timer_config_t timer_cfg = NRFX_TIMER_DEFAULT_CONFIG;
+    timer_cfg.bit_width = NRF_TIMER_BIT_WIDTH_32;
+    err_code = nrfx_timer_init(&m_timer, &timer_cfg, timer_handler);
+    APP_ERROR_CHECK(err_code);
+    uint32_t ticks = nrfx_timer_ms_to_ticks(&m_timer, 5000);
+    nrfx_timer_extended_compare(&m_timer,
+                                   NRF_TIMER_CC_CHANNEL0,
+                                   ticks,
+                                   NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK,
+                                   false);
+    nrfx_timer_enable(&m_timer);
+		// 
+    uint32_t timer_compare_event_addr = nrfx_timer_compare_event_address_get(&m_timer,
+                                                                                NRF_TIMER_CC_CHANNEL0);
+		//uint32_t timer_compare_event_addr = nrfx_rtc_event_address_get	(&m_timer ,NRF_RTC_EVENT_COMPARE_0)
+		
+    uint32_t saadc_sample_task_addr   = nrfx_saadc_sample_task_get();
+
+    /* setup ppi channel so that timer compare event is triggering sample task in SAADC */
+    err_code = nrfx_ppi_channel_alloc(&m_ppi_channel);
+    APP_ERROR_CHECK(err_code);
+		// nrfx_ppi_channel_assign(ppi_channel, event_endpoint_addr, task_endpoint_addr)
+    err_code = nrfx_ppi_channel_assign(m_ppi_channel,
+                                          timer_compare_event_addr,
+                                          saadc_sample_task_addr);
+    APP_ERROR_CHECK(err_code);
+}
+
+
+void saadc_sampling_event_enable(void)
+{
+    ret_code_t err_code = nrfx_ppi_channel_enable(m_ppi_channel);
+
+    APP_ERROR_CHECK(err_code);
+}
+
+
+void saadc_callback(nrfx_saadc_evt_t const * p_event)
+{
+    if (p_event->type == NRFX_SAADC_EVT_DONE)
+    {
+        ret_code_t err_code;
+
+        err_code = nrfx_saadc_buffer_convert(p_event->data.done.p_buffer, SAMPLES_IN_BUFFER);
+        APP_ERROR_CHECK(err_code);
+
+        int i;
+        NRF_LOG_INFO("ADC event number: %d", (int)m_adc_evt_counter);
+
+        for (i = 0; i < SAMPLES_IN_BUFFER; i++)
+        {
+            NRF_LOG_INFO("%d", p_event->data.done.p_buffer[i]);
+        }
+        m_adc_evt_counter++;
+    }
+		nrf_drv_gpiote_out_toggle(LED_3);
+		
+		advertising_start();
+}
+
+
+void saadc_init(void)
+{
+		ret_code_t err_code;
+		
+		nrfx_saadc_config_t saadc_config;
+		saadc_config.resolution = NRF_SAADC_RESOLUTION_12BIT;                                 
+		saadc_config.oversample = NRF_SAADC_OVERSAMPLE_8X;
+		saadc_config.interrupt_priority = APP_IRQ_PRIORITY_LOW;
+		saadc_config.low_power_mode = true;
+
+		nrf_saadc_channel_config_t channel_config; //= NRFX_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN0);
+    channel_config.resistor_p = NRF_SAADC_RESISTOR_DISABLED;
+    channel_config.resistor_n = NRF_SAADC_RESISTOR_DISABLED;
+    channel_config.gain       = NRF_SAADC_GAIN1_6;
+    channel_config.reference  = NRF_SAADC_REFERENCE_INTERNAL;
+    channel_config.acq_time   = NRF_SAADC_ACQTIME_10US;
+    channel_config.mode       = NRF_SAADC_MODE_SINGLE_ENDED;
+		channel_config.burst      = NRF_SAADC_BURST_ENABLED; // If ON: Executes all Oversample times as quickly as possible on each activation
+    channel_config.pin_p      = NRF_SAADC_INPUT_AIN0;
+    channel_config.pin_n      = NRF_SAADC_INPUT_DISABLED;
+		
+		err_code = nrfx_saadc_init(&saadc_config, saadc_callback);
+		APP_ERROR_CHECK(err_code);
+
+		err_code = nrfx_saadc_channel_init(0, &channel_config);
+		APP_ERROR_CHECK(err_code);
+
+		err_code = nrfx_saadc_buffer_convert(m_buffer_pool[0], SAMPLES_IN_BUFFER);
+		APP_ERROR_CHECK(err_code);
+
+		err_code = nrfx_saadc_buffer_convert(m_buffer_pool[1], SAMPLES_IN_BUFFER); // "Extra" buffer to write to when buffer 1 is full
+		APP_ERROR_CHECK(err_code);
+}
+
+
+// SAADC END
+
 
 /**@brief Function for initializing logging. */
 static void log_init(void)
@@ -284,6 +417,7 @@ static void log_init(void)
     APP_ERROR_CHECK(err_code);
 
     NRF_LOG_DEFAULT_BACKENDS_INIT();
+	
 }
 
 /**@brief Function for initializing LEDs. */
@@ -367,7 +501,7 @@ static void repeated_timer_create()
 
 void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
 {
-	NRF_LOG_INFO("ERROR on line %d, pc: %d, info: %d");
+	NRF_LOG_INFO("ERROR on line %d, pc: %d, info: %d", id, pc, info);
 }
 
 /**
@@ -375,7 +509,8 @@ void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
  */
 int main(void)
 {
-    // INITIALIZE
+/*
+		// INITIALIZE
     log_init();
     timers_init();
     leds_init();
@@ -392,6 +527,23 @@ int main(void)
 		{
 			idle_state_handle();
 		}
+	*/
+		leds_init();
+		log_init();
+		power_management_init();
+		ble_stack_init();
+		advertising_init();
+    advertising_start();
+		saadc_init();
+    saadc_sampling_event_init();
+    saadc_sampling_event_enable();
+    NRF_LOG_INFO("SAADC HAL simple example started.");
+
+    while (1)
+    {
+        nrf_pwr_mgmt_run();
+        NRF_LOG_FLUSH();
+    }
 }
 
 
