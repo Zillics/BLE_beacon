@@ -236,13 +236,10 @@ static void advertising_init(void)
 static void advertising_start(void)
 {
     ret_code_t err_code;
-		NRF_LOG_INFO("STARTING ADVERTISING....");
     err_code = sd_ble_gap_adv_start(m_adv_handle, APP_BLE_CONN_CFG_TAG);
-		NRF_LOG_INFO("ERROR CODE: %d", err_code);
 		APP_ERROR_CHECK(err_code);
-		NRF_LOG_INFO("AFTER APP_ERROR_CHECK");
-    //err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING);
-    //APP_ERROR_CHECK(err_code);
+    err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING);
+    APP_ERROR_CHECK(err_code);
 }
 
 static void advertising_stop(void)
@@ -318,8 +315,7 @@ void saadc_sampling_event_init(void)
     timer_cfg.bit_width = NRF_TIMER_BIT_WIDTH_32;
     err_code = nrfx_timer_init(&m_timer, &timer_cfg, timer_handler);
     APP_ERROR_CHECK(err_code);
-    /* setup m_timer for compare event every 400ms */
-    uint32_t ticks = nrfx_timer_ms_to_ticks(&m_timer, 200);
+    uint32_t ticks = nrfx_timer_ms_to_ticks(&m_timer, 5000);
     nrfx_timer_extended_compare(&m_timer,
                                    NRF_TIMER_CC_CHANNEL0,
                                    ticks,
@@ -372,7 +368,7 @@ void saadc_callback(nrfx_saadc_evt_t const * p_event)
     }
 		nrf_drv_gpiote_out_toggle(LED_3);
 		
-		//advertising_start();
+		advertising_start();
 }
 
 
