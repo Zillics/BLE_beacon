@@ -330,7 +330,7 @@ void saadc_sampling_event_init(void)
     timer_cfg.bit_width = NRF_TIMER_BIT_WIDTH_32;
     err_code = nrfx_timer_init(&m_timer, &timer_cfg, timer_handler);
     APP_ERROR_CHECK(err_code);
-    uint32_t ticks = nrfx_timer_ms_to_ticks(&m_timer, 6000);
+    uint32_t ticks = nrfx_timer_ms_to_ticks(&m_timer, 20000);
     nrfx_timer_extended_compare(&m_timer,
                                    NRF_TIMER_CC_CHANNEL0,
                                    ticks,
