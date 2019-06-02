@@ -73,11 +73,12 @@
 #include "app_error.h"
 #include "nrf_delay.h"
 #include "app_util_platform.h"
+#include "nrfx_rtc.h"
 
 #define SAMPLES_IN_BUFFER 1
 volatile uint8_t state = 1;
 
-static const nrfx_timer_t m_timer = NRFX_TIMER_INSTANCE(1);
+static const nrfx_rtc_t     m_rtc = NRFX_RTC_INSTANCE(2);
 static nrf_saadc_value_t     m_buffer_pool[2][SAMPLES_IN_BUFFER];
 static nrf_ppi_channel_t     m_ppi_channel;
 static uint32_t              m_adc_evt_counter;
@@ -308,6 +309,14 @@ static void ble_stack_init(void)
 
 /* BLE end */
 
+/* RTX */
+
+static void rtc_handler(nrfx_rtc_int_type_t int_type)
+{
+
+}
+
+/* RTX end */
 
 /*SAADC*/
 
@@ -325,33 +334,34 @@ void saadc_sampling_event_init(void)
     err_code = nrf_drv_ppi_init();
     APP_ERROR_CHECK(err_code);
 
-		// TIMER SETUP
-    nrfx_timer_config_t timer_cfg = NRFX_TIMER_DEFAULT_CONFIG;
-    timer_cfg.bit_width = NRF_TIMER_BIT_WIDTH_32;
-    err_code = nrfx_timer_init(&m_timer, &timer_cfg, timer_handler);
+		// RTC SETUP
+    nrfx_rtc_config_t rtc_config = NRFX_RTC_DEFAULT_CONFIG;
+		rtc_config.prescaler = 4095; // Set prescaler to 4095 -> frequency = 8 Hz
+    rtc_config.interrupt_priority = NRFX_RTC_DEFAULT_CONFIG_IRQ_PRIORITY;
+    rtc_config.reliable = NRFX_RTC_DEFAULT_CONFIG_RELIABLE;                  
+    rtc_config.tick_latency = NRFX_RTC_US_TO_TICKS(NRFX_RTC_MAXIMUM_LATENCY_US,NRFX_RTC_DEFAULT_CONFIG_FREQUENCY);
+    err_code = nrfx_rtc_init(&m_rtc, &rtc_config, rtc_handler);
     APP_ERROR_CHECK(err_code);
-    uint32_t ticks = nrfx_timer_ms_to_ticks(&m_timer, 20000);
-    nrfx_timer_extended_compare(&m_timer,
-                                   NRF_TIMER_CC_CHANNEL0,
-                                   ticks,
-                                   NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK,
-                                   false);
-    nrfx_timer_enable(&m_timer);
-		// 
-    uint32_t timer_compare_event_addr = nrfx_timer_compare_event_address_get(&m_timer,
-                                                                                NRF_TIMER_CC_CHANNEL0);
-		//uint32_t timer_compare_event_addr = nrfx_rtc_event_address_get	(&m_timer ,NRF_RTC_EVENT_COMPARE_0)
+    //Set compare channel 0 to trigger when value reaches 8 -> at 1 Hz
+    err_code = nrfx_rtc_cc_set(&m_rtc,0,40,false);
+    APP_ERROR_CHECK(err_code);
 		
-    uint32_t saadc_sample_task_addr   = nrfx_saadc_sample_task_get();
+		//Power on RTC instance
+		nrfx_rtc_enable(&m_rtc);
+    
+    uint32_t rtc_compare_event_addr = nrfx_rtc_event_address_get(&m_rtc, NRF_RTC_EVENT_COMPARE_0);
+    uint32_t rtc_clear_task_addr = nrfx_rtc_task_address_get(&m_rtc, NRF_RTC_TASK_CLEAR);
+    uint32_t saadc_sample_event_addr = nrfx_saadc_sample_task_get();
 
-    /* setup ppi channel so that timer compare event is triggering sample task in SAADC */
+		/* Setup ppi channel so that: RTC COMPARE -> TASK: sampling in SAADC + FORK: RTC clear*/
     err_code = nrfx_ppi_channel_alloc(&m_ppi_channel);
     APP_ERROR_CHECK(err_code);
-		// nrfx_ppi_channel_assign(ppi_channel, event_endpoint_addr, task_endpoint_addr)
-    err_code = nrfx_ppi_channel_assign(m_ppi_channel,
-                                          timer_compare_event_addr,
-                                          saadc_sample_task_addr);
-    APP_ERROR_CHECK(err_code);
+		//nrfx_ppi_channel_assign(ppi_channel, event, task_to_activate_during_event);
+		err_code = nrfx_ppi_channel_assign(m_ppi_channel, rtc_compare_event_addr, saadc_sample_event_addr);
+		APP_ERROR_CHECK(err_code);
+		// Assign a second task, i.e. a "fork" to be executed in addition to primary task
+		err_code = nrfx_ppi_channel_fork_assign(m_ppi_channel, rtc_clear_task_addr);
+		APP_ERROR_CHECK(err_code);
 }
 
 
@@ -383,7 +393,6 @@ void saadc_callback(nrfx_saadc_evt_t const * p_event)
         m_adc_evt_counter++;
     }
 		nrf_drv_gpiote_out_toggle(LED_3);
-		
 		advertising_init();
 		advertising_start();
 }
@@ -547,6 +556,7 @@ int main(void)
 	*/
 		leds_init();
 		log_init();
+		timers_init();
 		power_management_init();
 		ble_stack_init();
 		advertising_init();
