@@ -76,7 +76,6 @@
 #include "nrfx_rtc.h"
 
 #define SAMPLES_IN_BUFFER 1
-volatile uint8_t state = 1;
 
 static const nrfx_rtc_t     m_rtc = NRFX_RTC_INSTANCE(2);
 static nrf_saadc_value_t     m_buffer_pool[2][SAMPLES_IN_BUFFER];
@@ -105,10 +104,6 @@ static uint32_t              m_adc_evt_counter;
 #define MAJ_VAL_OFFSET_IN_BEACON_INFO   18                                 /**< Position of the MSB of the Major Value in m_beacon_info array. */
 #define UICR_ADDRESS                    0x10001080                         /**< Address of the UICR register used by this example. The major and minor versions to be encoded into the advertising data will be picked up from this location. */
 #endif
-
-APP_TIMER_DEF(m_oneshot_timer_id); // RTC timer variable initialization
-APP_TIMER_DEF(m_ble_timeout_timer_id); // RTC timer variable initialization
-APP_TIMER_DEF(m_repeated_timer_id); // RTC timer variable initialization. FOR DEBUGGING
 
 /* BLE */
 
@@ -309,14 +304,14 @@ static void ble_stack_init(void)
 
 /* BLE end */
 
-/* RTX */
+/* RTC */
 
 static void rtc_handler(nrfx_rtc_int_type_t int_type)
 {
 
 }
 
-/* RTX end */
+/* RTC end */
 
 /*SAADC*/
 
@@ -383,16 +378,16 @@ void saadc_callback(nrfx_saadc_evt_t const * p_event)
         APP_ERROR_CHECK(err_code);
 
         int i;
-        NRF_LOG_INFO("ADC event number: %d", (int)m_adc_evt_counter);
+        //NRF_LOG_INFO("ADC event number: %d", (int)m_adc_evt_counter);
 
         for (i = 0; i < SAMPLES_IN_BUFFER; i++)
         {			 
 						convert16to8((uint16_t)p_event->data.done.p_buffer[i], m_moisture_level);
-            NRF_LOG_INFO("%d", p_event->data.done.p_buffer[i]);
+            //NRF_LOG_INFO("%d", p_event->data.done.p_buffer[i]);
         }
         m_adc_evt_counter++;
     }
-		nrf_drv_gpiote_out_toggle(LED_3);
+		//nrf_drv_gpiote_out_toggle(LED_3);
 		advertising_init();
 		advertising_start();
 }
@@ -481,44 +476,10 @@ static void idle_state_handle(void)
     if (NRF_LOG_PROCESS() == false)
     {
 				uint32_t err_code;
-        //nrf_pwr_mgmt_run();
 				err_code = sd_app_evt_wait();
 				APP_ERROR_CHECK(err_code);
 
     }
-		else
-		{
-			//NRF_LOG_INFO("NRF_LOG_PROCESS == TRUE");
-		}
-}
-
-static void oneshot_timer_handler(void * p_context)
-{
-	nrf_drv_gpiote_out_toggle(LED_3);
-}
-
-static void repeated_timer_handler(void * p_context)
-{
-	nrf_drv_gpiote_out_toggle(LED_2);
-	advertising_start();
-}
-
-static void oneshot_timer_create()
-{
-	ret_code_t err_code;
-	err_code = app_timer_create(&m_oneshot_timer_id,
-                                APP_TIMER_MODE_SINGLE_SHOT,
-                                oneshot_timer_handler);
-}
-
-static void repeated_timer_create()
-{
-	ret_code_t err_code;
-	err_code = app_timer_create(&m_repeated_timer_id,
-                                APP_TIMER_MODE_REPEATED,
-                                repeated_timer_handler);
-	APP_ERROR_CHECK(err_code);
-	app_timer_start(m_oneshot_timer_id,APP_TIMER_TICKS(500),NULL);
 }
 
 /**
@@ -527,7 +488,7 @@ static void repeated_timer_create()
 
 void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
 {
-	NRF_LOG_INFO("ERROR on line %d, pc: %d, info: %d", id, pc, info);
+	//NRF_LOG_INFO("ERROR on line %d, pc: %d, info: %d", id, pc, info);
 }
 
 /**
@@ -535,27 +496,8 @@ void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
  */
 int main(void)
 {
-/*
-		// INITIALIZE
-    log_init();
-    timers_init();
-    leds_init();
-    power_management_init();
-    ble_stack_init();
-    advertising_init();
-		// START TIMER
-		//oneshot_timer_create();
-		repeated_timer_create();
-		//app_timer_start(m_repeated_timer_id,APP_TIMER_TICKS(2000),NULL);
-		advertising_start();
-		app_timer_start(m_repeated_timer_id,APP_TIMER_TICKS(5000),NULL);
-		for(;;)
-		{
-			idle_state_handle();
-		}
-	*/
-		leds_init();
-		log_init();
+		//leds_init();
+		//log_init();
 		timers_init();
 		power_management_init();
 		ble_stack_init();
@@ -564,12 +506,12 @@ int main(void)
 		saadc_init();
     saadc_sampling_event_init();
     saadc_sampling_event_enable();
-    NRF_LOG_INFO("SAADC HAL simple example started.");
+    //NRF_LOG_INFO("SAADC HAL simple example started.");
 
     while (1)
     {
         nrf_pwr_mgmt_run();
-        NRF_LOG_FLUSH();
+        //NRF_LOG_FLUSH();
     }
 }
 
