@@ -83,7 +83,7 @@ static nrf_ppi_channel_t     m_ppi_channel_saadc;
 static nrf_ppi_channel_t		 m_ppi_channel_gpio;
 static uint32_t              m_adc_evt_counter;
 
-#define INTERRUPT_OUT_GPIO_PIN BSP_LED_0 /* Set this to pin going to INT (event driven control pin) of S6A102 */
+#define INTERRUPT_OUT_GPIO_PIN 11 /* Set this to pin going to INT (event driven control pin) of S6A102 */
 
 #define APP_BLE_CONN_CFG_TAG            1                                  /**< A tag identifying the SoftDevice BLE configuration. */
 
@@ -362,7 +362,7 @@ void saadc_sampling_event_init(void)
 		APP_ERROR_CHECK(err_code);
 		/* Setup ppi channel so that: RTC COMPARE -> TASK: set digital pin HIGH */
 		nrfx_gpiote_out_config_t config_gpiote;
-		config_gpiote.action = NRF_GPIOTE_POLARITY_TOGGLE;
+		config_gpiote.action = NRF_GPIOTE_POLARITY_LOTOHI;
 		config_gpiote.init_state = NRF_GPIOTE_INITIAL_VALUE_LOW;
 		config_gpiote.task_pin = true; //...or should it be false?
 		err_code = nrfx_ppi_channel_alloc(&m_ppi_channel_gpio);
@@ -406,7 +406,9 @@ void saadc_callback(nrfx_saadc_evt_t const * p_event)
         }
         m_adc_evt_counter++;
     }
-		//nrfx_gpiote_out_clear(INTERRUPT_OUT_GPIO_PIN);
+		uint32_t gpiote_task_addr = nrfx_gpiote_out_task_addr_get(INTERRUPT_OUT_GPIO_PIN);
+		//nrf_gpiote_task_force	(gpiote_task_addr,NRF_GPIOTE_INITIAL_VALUE_HIGH);
+		nrf_gpiote_te_default(gpiote_task_addr);	
 		advertising_init();
 		advertising_start();
 }
