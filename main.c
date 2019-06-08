@@ -270,7 +270,7 @@ static void ble_hids_on_ble_evt(ble_evt_t const *p_ble_evt, void *p_context)
 	{
 			case BLE_GAP_EVT_TIMEOUT:
 					m_adv_ready_flag = true;
-					nrf_drv_gpiote_out_toggle(LED_3);
+					nrfx_gpiote_out_toggle(LED_3);
 					advertising_start();
 					break; // BLE_GAP_EVT_TIMEOUT
 			default:
@@ -331,7 +331,8 @@ void saadc_sampling_event_init(void)
 
     err_code = nrf_drv_ppi_init();
     APP_ERROR_CHECK(err_code);
-
+		err_code = nrfx_gpiote_init();
+		APP_ERROR_CHECK(err_code);
 		// RTC SETUP
     nrfx_rtc_config_t rtc_config = NRFX_RTC_DEFAULT_CONFIG;
 		rtc_config.prescaler = 4095; // Set prescaler to 4095 -> frequency = 8 Hz
@@ -360,17 +361,18 @@ void saadc_sampling_event_init(void)
 		err_code = nrfx_ppi_channel_fork_assign(m_ppi_channel_saadc, rtc_clear_task_addr);
 		APP_ERROR_CHECK(err_code);
 		/* Setup ppi channel so that: RTC COMPARE -> TASK: set digital pin HIGH */
-		nrfx_gpiote_out_config_t config;
-		config.action = NRF_GPIOTE_POLARITY_LOTOHI;
-		config.init_state = NRF_GPIOTE_INITIAL_VALUE_LOW;
-		config.task_pin = true; //...or should it be false?
-    err_code = nrfx_gpiote_out_init(INTERRUPT_OUT_GPIO_PIN, &config);
+		nrfx_gpiote_out_config_t config_gpiote;
+		config_gpiote.action = NRF_GPIOTE_POLARITY_TOGGLE;
+		config_gpiote.init_state = NRF_GPIOTE_INITIAL_VALUE_LOW;
+		config_gpiote.task_pin = true; //...or should it be false?
+		err_code = nrfx_ppi_channel_alloc(&m_ppi_channel_gpio);
+		err_code = nrfx_gpiote_out_init(INTERRUPT_OUT_GPIO_PIN, &config_gpiote);
     APP_ERROR_CHECK(err_code);
 		uint32_t gpiote_task_addr = nrfx_gpiote_out_task_addr_get(INTERRUPT_OUT_GPIO_PIN);
-		err_code = nrfx_ppi_channel_alloc(&m_ppi_channel_gpio);
 		APP_ERROR_CHECK(err_code);
 		err_code = nrfx_ppi_channel_assign(m_ppi_channel_gpio, rtc_compare_event_addr, gpiote_task_addr);
 		APP_ERROR_CHECK(err_code);
+		nrfx_gpiote_out_task_enable(INTERRUPT_OUT_GPIO_PIN);
 }
 
 
@@ -389,7 +391,6 @@ void saadc_callback(nrfx_saadc_evt_t const * p_event)
 {
     if (p_event->type == NRFX_SAADC_EVT_DONE)
     {
-				nrfx_gpiote_out_clear(INTERRUPT_OUT_GPIO_PIN);// Set interrupt pin for S6A102 to LOW -> moisture sensor turned off
         ret_code_t err_code;
 
         err_code = nrfx_saadc_buffer_convert(p_event->data.done.p_buffer, SAMPLES_IN_BUFFER);
@@ -405,7 +406,7 @@ void saadc_callback(nrfx_saadc_evt_t const * p_event)
         }
         m_adc_evt_counter++;
     }
-		//nrf_drv_gpiote_out_toggle(LED_3);
+		//nrfx_gpiote_out_clear(INTERRUPT_OUT_GPIO_PIN);
 		advertising_init();
 		advertising_start();
 }
