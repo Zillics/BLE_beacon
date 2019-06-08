@@ -73,11 +73,11 @@
 #include "app_error.h"
 #include "nrf_delay.h"
 #include "app_util_platform.h"
+#include "nrfx_rtc.h"
 
 #define SAMPLES_IN_BUFFER 1
-volatile uint8_t state = 1;
 
-static const nrfx_timer_t m_timer = NRFX_TIMER_INSTANCE(1);
+static const nrfx_rtc_t     m_rtc = NRFX_RTC_INSTANCE(2);
 static nrf_saadc_value_t     m_buffer_pool[2][SAMPLES_IN_BUFFER];
 static nrf_ppi_channel_t     m_ppi_channel;
 static uint32_t              m_adc_evt_counter;
@@ -104,10 +104,6 @@ static uint32_t              m_adc_evt_counter;
 #define MAJ_VAL_OFFSET_IN_BEACON_INFO   18                                 /**< Position of the MSB of the Major Value in m_beacon_info array. */
 #define UICR_ADDRESS                    0x10001080                         /**< Address of the UICR register used by this example. The major and minor versions to be encoded into the advertising data will be picked up from this location. */
 #endif
-
-APP_TIMER_DEF(m_oneshot_timer_id); // RTC timer variable initialization
-APP_TIMER_DEF(m_ble_timeout_timer_id); // RTC timer variable initialization
-APP_TIMER_DEF(m_repeated_timer_id); // RTC timer variable initialization. FOR DEBUGGING
 
 /* BLE */
 
@@ -150,6 +146,21 @@ static uint8_t m_beacon_info[APP_BEACON_INFO_LENGTH] =                    /**< I
                          // this implementation.
 };
 
+#define MOISTURE_DATA_LENGTH 2
+static uint8_t m_moisture_level[MOISTURE_DATA_LENGTH] = 
+{
+		0x00,
+		0x00
+};
+
+// Converts a 16-bit value to an array of two 8-bit values and places it in dest
+static void convert16to8(uint16_t src, uint8_t * dest)
+{
+	//NRF_LOG_INFO("CONVERTING %d .....",src);
+	dest[0] = (uint8_t) (src >> 8);
+	dest[1] = (uint8_t) (src);
+	//NRF_LOG_INFO("...TO [%d , %d]",dest[0],dest[1]);
+}
 
 /**@brief Callback function for asserts in the SoftDevice.
  *
@@ -204,8 +215,8 @@ static void advertising_init(void)
     m_beacon_info[index++] = LSB_16(minor_value);
 #endif
 
-    manuf_specific_data.data.p_data = (uint8_t *) m_beacon_info;
-    manuf_specific_data.data.size   = APP_BEACON_INFO_LENGTH;
+    manuf_specific_data.data.p_data = (uint8_t *) m_moisture_level;
+    manuf_specific_data.data.size   = MOISTURE_DATA_LENGTH;//APP_BEACON_INFO_LENGTH;
 
     // Build and set advertising data.
     memset(&advdata, 0, sizeof(advdata));
@@ -238,8 +249,8 @@ static void advertising_start(void)
     ret_code_t err_code;
     err_code = sd_ble_gap_adv_start(m_adv_handle, APP_BLE_CONN_CFG_TAG);
 		APP_ERROR_CHECK(err_code);
-    err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING);
-    APP_ERROR_CHECK(err_code);
+    //err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING);
+    //APP_ERROR_CHECK(err_code);
 }
 
 static void advertising_stop(void)
@@ -293,6 +304,14 @@ static void ble_stack_init(void)
 
 /* BLE end */
 
+/* RTC */
+
+static void rtc_handler(nrfx_rtc_int_type_t int_type)
+{
+
+}
+
+/* RTC end */
 
 /*SAADC*/
 
@@ -310,33 +329,34 @@ void saadc_sampling_event_init(void)
     err_code = nrf_drv_ppi_init();
     APP_ERROR_CHECK(err_code);
 
-		// TIMER SETUP
-    nrfx_timer_config_t timer_cfg = NRFX_TIMER_DEFAULT_CONFIG;
-    timer_cfg.bit_width = NRF_TIMER_BIT_WIDTH_32;
-    err_code = nrfx_timer_init(&m_timer, &timer_cfg, timer_handler);
+		// RTC SETUP
+    nrfx_rtc_config_t rtc_config = NRFX_RTC_DEFAULT_CONFIG;
+		rtc_config.prescaler = 4095; // Set prescaler to 4095 -> frequency = 8 Hz
+    rtc_config.interrupt_priority = NRFX_RTC_DEFAULT_CONFIG_IRQ_PRIORITY;
+    rtc_config.reliable = NRFX_RTC_DEFAULT_CONFIG_RELIABLE;                  
+    rtc_config.tick_latency = NRFX_RTC_US_TO_TICKS(NRFX_RTC_MAXIMUM_LATENCY_US,NRFX_RTC_DEFAULT_CONFIG_FREQUENCY);
+    err_code = nrfx_rtc_init(&m_rtc, &rtc_config, rtc_handler);
     APP_ERROR_CHECK(err_code);
-    uint32_t ticks = nrfx_timer_ms_to_ticks(&m_timer, 5000);
-    nrfx_timer_extended_compare(&m_timer,
-                                   NRF_TIMER_CC_CHANNEL0,
-                                   ticks,
-                                   NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK,
-                                   false);
-    nrfx_timer_enable(&m_timer);
-		// 
-    uint32_t timer_compare_event_addr = nrfx_timer_compare_event_address_get(&m_timer,
-                                                                                NRF_TIMER_CC_CHANNEL0);
-		//uint32_t timer_compare_event_addr = nrfx_rtc_event_address_get	(&m_timer ,NRF_RTC_EVENT_COMPARE_0)
+    //Set compare channel 0 to trigger when value reaches 8 -> at 1 Hz
+    err_code = nrfx_rtc_cc_set(&m_rtc,0,40,false);
+    APP_ERROR_CHECK(err_code);
 		
-    uint32_t saadc_sample_task_addr   = nrfx_saadc_sample_task_get();
+		//Power on RTC instance
+		nrfx_rtc_enable(&m_rtc);
+    
+    uint32_t rtc_compare_event_addr = nrfx_rtc_event_address_get(&m_rtc, NRF_RTC_EVENT_COMPARE_0);
+    uint32_t rtc_clear_task_addr = nrfx_rtc_task_address_get(&m_rtc, NRF_RTC_TASK_CLEAR);
+    uint32_t saadc_sample_event_addr = nrfx_saadc_sample_task_get();
 
-    /* setup ppi channel so that timer compare event is triggering sample task in SAADC */
+		/* Setup ppi channel so that: RTC COMPARE -> TASK: sampling in SAADC + FORK: RTC clear*/
     err_code = nrfx_ppi_channel_alloc(&m_ppi_channel);
     APP_ERROR_CHECK(err_code);
-		// nrfx_ppi_channel_assign(ppi_channel, event_endpoint_addr, task_endpoint_addr)
-    err_code = nrfx_ppi_channel_assign(m_ppi_channel,
-                                          timer_compare_event_addr,
-                                          saadc_sample_task_addr);
-    APP_ERROR_CHECK(err_code);
+		//nrfx_ppi_channel_assign(ppi_channel, event, task_to_activate_during_event);
+		err_code = nrfx_ppi_channel_assign(m_ppi_channel, rtc_compare_event_addr, saadc_sample_event_addr);
+		APP_ERROR_CHECK(err_code);
+		// Assign a second task, i.e. a "fork" to be executed in addition to primary task
+		err_code = nrfx_ppi_channel_fork_assign(m_ppi_channel, rtc_clear_task_addr);
+		APP_ERROR_CHECK(err_code);
 }
 
 
@@ -358,16 +378,17 @@ void saadc_callback(nrfx_saadc_evt_t const * p_event)
         APP_ERROR_CHECK(err_code);
 
         int i;
-        NRF_LOG_INFO("ADC event number: %d", (int)m_adc_evt_counter);
+        //NRF_LOG_INFO("ADC event number: %d", (int)m_adc_evt_counter);
 
         for (i = 0; i < SAMPLES_IN_BUFFER; i++)
-        {
-            NRF_LOG_INFO("%d", p_event->data.done.p_buffer[i]);
+        {			 
+						convert16to8((uint16_t)p_event->data.done.p_buffer[i], m_moisture_level);
+            //NRF_LOG_INFO("%d", p_event->data.done.p_buffer[i]);
         }
         m_adc_evt_counter++;
     }
-		nrf_drv_gpiote_out_toggle(LED_3);
-		
+		//nrf_drv_gpiote_out_toggle(LED_3);
+		advertising_init();
 		advertising_start();
 }
 
@@ -455,44 +476,10 @@ static void idle_state_handle(void)
     if (NRF_LOG_PROCESS() == false)
     {
 				uint32_t err_code;
-        //nrf_pwr_mgmt_run();
 				err_code = sd_app_evt_wait();
 				APP_ERROR_CHECK(err_code);
 
     }
-		else
-		{
-			//NRF_LOG_INFO("NRF_LOG_PROCESS == TRUE");
-		}
-}
-
-static void oneshot_timer_handler(void * p_context)
-{
-	nrf_drv_gpiote_out_toggle(LED_3);
-}
-
-static void repeated_timer_handler(void * p_context)
-{
-	nrf_drv_gpiote_out_toggle(LED_2);
-	advertising_start();
-}
-
-static void oneshot_timer_create()
-{
-	ret_code_t err_code;
-	err_code = app_timer_create(&m_oneshot_timer_id,
-                                APP_TIMER_MODE_SINGLE_SHOT,
-                                oneshot_timer_handler);
-}
-
-static void repeated_timer_create()
-{
-	ret_code_t err_code;
-	err_code = app_timer_create(&m_repeated_timer_id,
-                                APP_TIMER_MODE_REPEATED,
-                                repeated_timer_handler);
-	APP_ERROR_CHECK(err_code);
-	app_timer_start(m_oneshot_timer_id,APP_TIMER_TICKS(500),NULL);
 }
 
 /**
@@ -501,7 +488,7 @@ static void repeated_timer_create()
 
 void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
 {
-	NRF_LOG_INFO("ERROR on line %d, pc: %d, info: %d", id, pc, info);
+	//NRF_LOG_INFO("ERROR on line %d, pc: %d, info: %d", id, pc, info);
 }
 
 /**
@@ -509,27 +496,9 @@ void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
  */
 int main(void)
 {
-/*
-		// INITIALIZE
-    log_init();
-    timers_init();
-    leds_init();
-    power_management_init();
-    ble_stack_init();
-    advertising_init();
-		// START TIMER
-		//oneshot_timer_create();
-		repeated_timer_create();
-		//app_timer_start(m_repeated_timer_id,APP_TIMER_TICKS(2000),NULL);
-		advertising_start();
-		app_timer_start(m_repeated_timer_id,APP_TIMER_TICKS(5000),NULL);
-		for(;;)
-		{
-			idle_state_handle();
-		}
-	*/
-		leds_init();
-		log_init();
+		//leds_init();
+		//log_init();
+		timers_init();
 		power_management_init();
 		ble_stack_init();
 		advertising_init();
@@ -537,12 +506,12 @@ int main(void)
 		saadc_init();
     saadc_sampling_event_init();
     saadc_sampling_event_enable();
-    NRF_LOG_INFO("SAADC HAL simple example started.");
+    //NRF_LOG_INFO("SAADC HAL simple example started.");
 
     while (1)
     {
         nrf_pwr_mgmt_run();
-        NRF_LOG_FLUSH();
+        //NRF_LOG_FLUSH();
     }
 }
 
