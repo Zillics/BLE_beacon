@@ -81,6 +81,7 @@ static const nrfx_rtc_t     m_rtc = NRFX_RTC_INSTANCE(2);
 static nrf_saadc_value_t     m_buffer_pool[2][SAMPLES_IN_BUFFER];
 static nrf_ppi_channel_t     m_ppi_channel_saadc;
 static nrf_ppi_channel_t		 m_ppi_channel_gpio;
+static nrf_ppi_channel_t		 m_ppi_channel_gpio_clr;
 static uint32_t              m_adc_evt_counter;
 
 #define INTERRUPT_OUT_GPIO_PIN 11 /* Set this to pin going to INT (event driven control pin) of S6A102 */
@@ -362,10 +363,12 @@ void saadc_sampling_event_init(void)
 		APP_ERROR_CHECK(err_code);
 		/* Setup ppi channel so that: RTC COMPARE -> TASK: set digital pin HIGH */
 		nrfx_gpiote_out_config_t config_gpiote;
-		config_gpiote.action = NRF_GPIOTE_POLARITY_LOTOHI;
+		config_gpiote.action = NRF_GPIOTE_POLARITY_TOGGLE;
 		config_gpiote.init_state = NRF_GPIOTE_INITIAL_VALUE_LOW;
 		config_gpiote.task_pin = true; //...or should it be false?
+		
 		err_code = nrfx_ppi_channel_alloc(&m_ppi_channel_gpio);
+		APP_ERROR_CHECK(err_code);
 		err_code = nrfx_gpiote_out_init(INTERRUPT_OUT_GPIO_PIN, &config_gpiote);
     APP_ERROR_CHECK(err_code);
 		uint32_t gpiote_task_addr = nrfx_gpiote_out_task_addr_get(INTERRUPT_OUT_GPIO_PIN);
@@ -373,6 +376,18 @@ void saadc_sampling_event_init(void)
 		err_code = nrfx_ppi_channel_assign(m_ppi_channel_gpio, rtc_compare_event_addr, gpiote_task_addr);
 		APP_ERROR_CHECK(err_code);
 		nrfx_gpiote_out_task_enable(INTERRUPT_OUT_GPIO_PIN);
+		
+		/* Setup ppi channel so that: NRF_SAADC_EVENT_END -> TASK: set digital pin LOW */
+/*
+		nrfx_gpiote_out_config_t config_gpiote_clr;
+		config_gpiote_clr.action = NRF_GPIOTE_POLARITY_HITOLO;
+		config_gpiote_clr.init_state = NRF_GPIOTE_INITIAL_VALUE_HIGH;
+		config_gpiote_clr.task_pin = true; //...or should it be false?
+*/
+		err_code = nrfx_ppi_channel_alloc(&m_ppi_channel_gpio_clr);
+		APP_ERROR_CHECK(err_code);
+		uint32_t saadc_evt_end_addr = nrf_saadc_event_address_get(NRF_SAADC_EVENT_RESULTDONE); 
+		err_code = nrfx_ppi_channel_assign(m_ppi_channel_gpio_clr,saadc_evt_end_addr,gpiote_task_addr);
 }
 
 
@@ -383,6 +398,8 @@ void saadc_sampling_event_enable(void)
     APP_ERROR_CHECK(err_code);
 		// Enable ppi channel for toggling GPIO pin HIGH needed for saadc sampling
 		err_code = nrfx_ppi_channel_enable(m_ppi_channel_gpio);
+		//APP_ERROR_CHECK(err_code);
+		err_code = nrfx_ppi_channel_enable(m_ppi_channel_gpio_clr);
 		APP_ERROR_CHECK(err_code);
 }
 
@@ -405,12 +422,13 @@ void saadc_callback(nrfx_saadc_evt_t const * p_event)
             //NRF_LOG_INFO("%d", p_event->data.done.p_buffer[i]);
         }
         m_adc_evt_counter++;
+				//uint32_t gpiote_task_addr = nrfx_gpiote_set_task_addr_get(INTERRUPT_OUT_GPIO_PIN);
+				//nrf_gpiote_task_force	(gpiote_task_addr,NRF_GPIOTE_INITIAL_VALUE_LOW);
+				//nrf_gpiote_task_disable(gpiote_task_addr);
+				//nrf_gpiote_te_default(gpiote_task_addr);
     }
-		uint32_t gpiote_task_addr = nrfx_gpiote_out_task_addr_get(INTERRUPT_OUT_GPIO_PIN);
-		//nrf_gpiote_task_force	(gpiote_task_addr,NRF_GPIOTE_INITIAL_VALUE_HIGH);
-		nrf_gpiote_te_default(gpiote_task_addr);	
 		advertising_init();
-		advertising_start();
+		advertising_start();	
 }
 
 
@@ -420,7 +438,7 @@ void saadc_init(void)
 		
 		nrfx_saadc_config_t saadc_config;
 		saadc_config.resolution = NRF_SAADC_RESOLUTION_12BIT;                                 
-		saadc_config.oversample = NRF_SAADC_OVERSAMPLE_8X;
+		saadc_config.oversample = NRF_SAADC_OVERSAMPLE_256X;
 		saadc_config.interrupt_priority = APP_IRQ_PRIORITY_LOW;
 		saadc_config.low_power_mode = true;
 
