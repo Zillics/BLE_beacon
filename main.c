@@ -57,7 +57,7 @@
 #include "ble_advdata.h"
 #include "app_timer.h"
 #include "nrf_pwr_mgmt.h"
-#include "nrf_drv_gpiote.h"
+#include "nrfx_gpiote.h"
 
 #include "nrf_log.h"
 #include "nrf_log_ctrl.h"
@@ -79,8 +79,12 @@
 
 static const nrfx_rtc_t     m_rtc = NRFX_RTC_INSTANCE(2);
 static nrf_saadc_value_t     m_buffer_pool[2][SAMPLES_IN_BUFFER];
-static nrf_ppi_channel_t     m_ppi_channel;
+static nrf_ppi_channel_t     m_ppi_channel_saadc;
+static nrf_ppi_channel_t		 m_ppi_channel_gpio;
+static nrf_ppi_channel_t		 m_ppi_channel_gpio_clr;
 static uint32_t              m_adc_evt_counter;
+
+#define INTERRUPT_OUT_GPIO_PIN 11 /* Set this to pin going to INT (event driven control pin) of S6A102 */
 
 #define APP_BLE_CONN_CFG_TAG            1                                  /**< A tag identifying the SoftDevice BLE configuration. */
 
@@ -267,7 +271,7 @@ static void ble_hids_on_ble_evt(ble_evt_t const *p_ble_evt, void *p_context)
 	{
 			case BLE_GAP_EVT_TIMEOUT:
 					m_adv_ready_flag = true;
-					nrf_drv_gpiote_out_toggle(LED_3);
+					nrfx_gpiote_out_toggle(LED_3);
 					advertising_start();
 					break; // BLE_GAP_EVT_TIMEOUT
 			default:
@@ -328,7 +332,8 @@ void saadc_sampling_event_init(void)
 
     err_code = nrf_drv_ppi_init();
     APP_ERROR_CHECK(err_code);
-
+		err_code = nrfx_gpiote_init();
+		APP_ERROR_CHECK(err_code);
 		// RTC SETUP
     nrfx_rtc_config_t rtc_config = NRFX_RTC_DEFAULT_CONFIG;
 		rtc_config.prescaler = 4095; // Set prescaler to 4095 -> frequency = 8 Hz
@@ -341,30 +346,61 @@ void saadc_sampling_event_init(void)
     err_code = nrfx_rtc_cc_set(&m_rtc,0,40,false);
     APP_ERROR_CHECK(err_code);
 		
-		//Power on RTC instance
-		nrfx_rtc_enable(&m_rtc);
-    
+	  /* RTC setup */
+		nrfx_rtc_enable(&m_rtc); //Power on RTC instance
     uint32_t rtc_compare_event_addr = nrfx_rtc_event_address_get(&m_rtc, NRF_RTC_EVENT_COMPARE_0);
     uint32_t rtc_clear_task_addr = nrfx_rtc_task_address_get(&m_rtc, NRF_RTC_TASK_CLEAR);
-    uint32_t saadc_sample_event_addr = nrfx_saadc_sample_task_get();
+    uint32_t saadc_sample_task_addr = nrfx_saadc_sample_task_get();
 
 		/* Setup ppi channel so that: RTC COMPARE -> TASK: sampling in SAADC + FORK: RTC clear*/
-    err_code = nrfx_ppi_channel_alloc(&m_ppi_channel);
+    err_code = nrfx_ppi_channel_alloc(&m_ppi_channel_saadc);
     APP_ERROR_CHECK(err_code);
 		//nrfx_ppi_channel_assign(ppi_channel, event, task_to_activate_during_event);
-		err_code = nrfx_ppi_channel_assign(m_ppi_channel, rtc_compare_event_addr, saadc_sample_event_addr);
+		err_code = nrfx_ppi_channel_assign(m_ppi_channel_saadc, rtc_compare_event_addr, saadc_sample_task_addr);
 		APP_ERROR_CHECK(err_code);
 		// Assign a second task, i.e. a "fork" to be executed in addition to primary task
-		err_code = nrfx_ppi_channel_fork_assign(m_ppi_channel, rtc_clear_task_addr);
+		err_code = nrfx_ppi_channel_fork_assign(m_ppi_channel_saadc, rtc_clear_task_addr);
 		APP_ERROR_CHECK(err_code);
+		/* Setup ppi channel so that: RTC COMPARE -> TASK: set digital pin HIGH */
+		nrfx_gpiote_out_config_t config_gpiote;
+		config_gpiote.action = NRF_GPIOTE_POLARITY_TOGGLE;
+		config_gpiote.init_state = NRF_GPIOTE_INITIAL_VALUE_LOW;
+		config_gpiote.task_pin = true; //...or should it be false?
+		
+		err_code = nrfx_ppi_channel_alloc(&m_ppi_channel_gpio);
+		APP_ERROR_CHECK(err_code);
+		err_code = nrfx_gpiote_out_init(INTERRUPT_OUT_GPIO_PIN, &config_gpiote);
+    APP_ERROR_CHECK(err_code);
+		uint32_t gpiote_task_addr = nrfx_gpiote_out_task_addr_get(INTERRUPT_OUT_GPIO_PIN);
+		APP_ERROR_CHECK(err_code);
+		err_code = nrfx_ppi_channel_assign(m_ppi_channel_gpio, rtc_compare_event_addr, gpiote_task_addr);
+		APP_ERROR_CHECK(err_code);
+		nrfx_gpiote_out_task_enable(INTERRUPT_OUT_GPIO_PIN);
+		
+		/* Setup ppi channel so that: NRF_SAADC_EVENT_END -> TASK: set digital pin LOW */
+/*
+		nrfx_gpiote_out_config_t config_gpiote_clr;
+		config_gpiote_clr.action = NRF_GPIOTE_POLARITY_HITOLO;
+		config_gpiote_clr.init_state = NRF_GPIOTE_INITIAL_VALUE_HIGH;
+		config_gpiote_clr.task_pin = true; //...or should it be false?
+*/
+		err_code = nrfx_ppi_channel_alloc(&m_ppi_channel_gpio_clr);
+		APP_ERROR_CHECK(err_code);
+		uint32_t saadc_evt_end_addr = nrf_saadc_event_address_get(NRF_SAADC_EVENT_RESULTDONE); 
+		err_code = nrfx_ppi_channel_assign(m_ppi_channel_gpio_clr,saadc_evt_end_addr,gpiote_task_addr);
 }
 
 
 void saadc_sampling_event_enable(void)
 {
-    ret_code_t err_code = nrfx_ppi_channel_enable(m_ppi_channel);
-
+		// Enable ppi channel for executing saadc sampling
+    ret_code_t err_code = nrfx_ppi_channel_enable(m_ppi_channel_saadc);
     APP_ERROR_CHECK(err_code);
+		// Enable ppi channel for toggling GPIO pin HIGH needed for saadc sampling
+		err_code = nrfx_ppi_channel_enable(m_ppi_channel_gpio);
+		//APP_ERROR_CHECK(err_code);
+		err_code = nrfx_ppi_channel_enable(m_ppi_channel_gpio_clr);
+		APP_ERROR_CHECK(err_code);
 }
 
 
@@ -386,10 +422,13 @@ void saadc_callback(nrfx_saadc_evt_t const * p_event)
             //NRF_LOG_INFO("%d", p_event->data.done.p_buffer[i]);
         }
         m_adc_evt_counter++;
+				//uint32_t gpiote_task_addr = nrfx_gpiote_set_task_addr_get(INTERRUPT_OUT_GPIO_PIN);
+				//nrf_gpiote_task_force	(gpiote_task_addr,NRF_GPIOTE_INITIAL_VALUE_LOW);
+				//nrf_gpiote_task_disable(gpiote_task_addr);
+				//nrf_gpiote_te_default(gpiote_task_addr);
     }
-		//nrf_drv_gpiote_out_toggle(LED_3);
 		advertising_init();
-		advertising_start();
+		advertising_start();	
 }
 
 
@@ -399,7 +438,7 @@ void saadc_init(void)
 		
 		nrfx_saadc_config_t saadc_config;
 		saadc_config.resolution = NRF_SAADC_RESOLUTION_12BIT;                                 
-		saadc_config.oversample = NRF_SAADC_OVERSAMPLE_8X;
+		saadc_config.oversample = NRF_SAADC_OVERSAMPLE_256X;
 		saadc_config.interrupt_priority = APP_IRQ_PRIORITY_LOW;
 		saadc_config.low_power_mode = true;
 
@@ -425,6 +464,7 @@ void saadc_init(void)
 
 		err_code = nrfx_saadc_buffer_convert(m_buffer_pool[1], SAMPLES_IN_BUFFER); // "Extra" buffer to write to when buffer 1 is full
 		APP_ERROR_CHECK(err_code);
+		
 }
 
 
