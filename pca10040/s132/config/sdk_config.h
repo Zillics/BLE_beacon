@@ -6911,7 +6911,7 @@
 // <e> NRF_DRV_CSENSE_ENABLED - nrf_drv_csense - Capacitive sensor low-level module
 //==========================================================
 #ifndef NRF_DRV_CSENSE_ENABLED
-#define NRF_DRV_CSENSE_ENABLED 0
+#define NRF_DRV_CSENSE_ENABLED 1
 #endif
 // <e> USE_COMP - Use the comparator to implement the capacitive sensor driver.
 
@@ -6936,7 +6936,7 @@
 // <i> I_SOURCE, VUP, and VDOWN are values used to initialize COMP and C is the capacitance of the used pad.
 
 #ifndef MEASUREMENT_PERIOD
-#define MEASUREMENT_PERIOD 20
+#define MEASUREMENT_PERIOD 40
 #endif
 
 // </e>

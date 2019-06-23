@@ -75,6 +75,9 @@
 #include "app_util_platform.h"
 #include "nrfx_rtc.h"
 
+// Capsense
+#include "nrf_drv_csense.h"
+
 #define SAMPLES_IN_BUFFER 1
 
 static const nrfx_rtc_t     m_rtc = NRFX_RTC_INSTANCE(2);
@@ -108,6 +111,27 @@ static uint32_t              m_adc_evt_counter;
 /* BLE */
 
 #define ADV_TIMEOUT 400
+
+// Macros for capacitive sensing START
+
+ #define APP_TIMER_TICKS_TIMEOUT APP_TIMER_TICKS(3000)
+ #define AIN_1                   1
+ #define AIN_2                   2
+ #define AIN_7                   7
+ #define PAD_1_MASK              (1UL << AIN_1)
+ #define PAD_2_MASK              (1UL << AIN_7)
+ #define PAD_ID_0                0
+ #define PAD_ID_1                1
+	/* Pin used to measure capacitor charging time. */
+	#if USE_COMP == 0
+	#ifdef ADC_PRESENT
+	#define CHARGE_OUTPUT_PIN 30
+	#elif defined(SAADC_PRESENT)
+	#define CHARGE_OUTPUT_PIN 26
+	#endif
+	#endif
+
+// Macros for capacitive sensing END
 
 static ble_gap_adv_params_t m_adv_params;                                  /**< Parameters to be passed to the stack when starting advertising. */
 static uint8_t              m_adv_handle = BLE_GAP_ADV_SET_HANDLE_NOT_SET; /**< Advertising handle used to identify an advertising set. */
@@ -491,27 +515,96 @@ void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
 	//NRF_LOG_INFO("ERROR on line %d, pc: %d, info: %d", id, pc, info);
 }
 
+// Capacitive sensing START
+
+
+ static void csense_timeout_handler(void * p_context)
+{
+    ret_code_t err_code;
+
+    err_code = nrf_drv_csense_sample();
+    if (err_code != NRF_SUCCESS)
+    {
+        NRF_LOG_INFO("Busy.\r\n");
+        return;
+    }
+}
+
+  void start_app_timer(void)
+{
+    ret_code_t err_code;
+
+    /* APP_TIMER definition for csense example. */
+    APP_TIMER_DEF(timer_0);
+
+    err_code = app_timer_create(&timer_0, APP_TIMER_MODE_REPEATED, csense_timeout_handler);
+    APP_ERROR_CHECK(err_code);
+
+    err_code = app_timer_start(timer_0, APP_TIMER_TICKS_TIMEOUT, NULL);
+    APP_ERROR_CHECK(err_code);
+}
+
+
+
+
+void csense_handler(nrf_drv_csense_evt_t * p_event_struct)
+{
+    switch (p_event_struct->analog_channel)
+    {
+        case AIN_1:
+        case AIN_2:
+                 //NRF_LOG_INFO("t:%d\r\n",p_event_struct->read_value);
+                 break;
+        case AIN_7:
+							NRF_LOG_INFO("t:%d\r\n",p_event_struct->read_value);
+              convert16to8(p_event_struct->read_value, m_moisture_level);
+							advertising_init();
+							advertising_start();
+							break;
+ 
+        default:
+            break;
+    }
+}
+
+
+void csense_initialize(void)
+{
+    ret_code_t err_code;
+
+    nrf_drv_csense_config_t csense_config = { 0 };
+
+#if USE_COMP == 0
+    csense_config.output_pin = CHARGE_OUTPUT_PIN;
+#endif
+
+    err_code = nrf_drv_csense_init(&csense_config, csense_handler);
+    APP_ERROR_CHECK(err_code);
+
+    nrf_drv_csense_channels_enable(PAD_2_MASK);
+}
+
+// Capacitive sensing END
+
+
 /**
  * @brief Function for application main entry.
  */
 int main(void)
 {
 		//leds_init();
-		//log_init();
+		log_init();
 		timers_init();
 		power_management_init();
 		ble_stack_init();
+		csense_initialize();
+		start_app_timer();
 		advertising_init();
-    advertising_start();
-		saadc_init();
-    saadc_sampling_event_init();
-    saadc_sampling_event_enable();
-    //NRF_LOG_INFO("SAADC HAL simple example started.");
-
+    advertising_start();	
     while (1)
     {
         nrf_pwr_mgmt_run();
-        //NRF_LOG_FLUSH();
+        NRF_LOG_FLUSH();
     }
 }
 
