@@ -78,6 +78,8 @@
 // Capsense
 #include "nrf_drv_csense.h"
 
+#define USE_LED_INDICATION 0
+
 #define SAMPLES_IN_BUFFER 1
 
 static const nrfx_rtc_t     m_rtc = NRFX_RTC_INSTANCE(2);
@@ -138,7 +140,6 @@ static uint8_t              m_adv_handle = BLE_GAP_ADV_SET_HANDLE_NOT_SET; /**< 
 static uint8_t              m_enc_advdata[BLE_GAP_ADV_SET_DATA_SIZE_MAX];  /**< Buffer for storing an encoded advertising set. */
 
 static bool m_adv_ready_flag;
-static bool m_oneshot_ready_flag;
 
 /**@brief Struct that contains pointers to the encoded advertising data. */
 static ble_gap_adv_data_t m_adv_data =
@@ -156,8 +157,9 @@ static ble_gap_adv_data_t m_adv_data =
     }
 };
 
-
-static uint8_t m_beacon_info[APP_BEACON_INFO_LENGTH] =                    /**< Information advertised by the Beacon. */
+/*
+// Information advertised by the Beacon. 
+static uint8_t m_beacon_info[APP_BEACON_INFO_LENGTH] =          
 {
     APP_DEVICE_TYPE,     // Manufacturer specific information. Specifies the device type in this
                          // implementation.
@@ -169,6 +171,7 @@ static uint8_t m_beacon_info[APP_BEACON_INFO_LENGTH] =                    /**< I
     APP_MEASURED_RSSI    // Manufacturer specific information. The Beacon's measured TX power in
                          // this implementation.
 };
+*/
 
 #define MOISTURE_DATA_LENGTH 2
 static uint8_t m_moisture_level[MOISTURE_DATA_LENGTH] = 
@@ -277,16 +280,17 @@ static void advertising_start(void)
     //APP_ERROR_CHECK(err_code);
 }
 
+/*
 static void advertising_stop(void)
 {
 	ret_code_t err_code;
 	err_code = sd_ble_gap_adv_stop(m_adv_handle);
 	APP_ERROR_CHECK(err_code);
 }
+*/
 
 static void ble_hids_on_ble_evt(ble_evt_t const *p_ble_evt, void *p_context)
 {
-	uint32_t err_code;
 	switch (p_ble_evt->header.evt_id)
 	{
 			case BLE_GAP_EVT_TIMEOUT:
@@ -465,13 +469,14 @@ static void log_init(void)
 	
 }
 
+#if USE_LED_INDICATION
 /**@brief Function for initializing LEDs. */
 static void leds_init(void)
 {
     ret_code_t err_code = bsp_init(BSP_INIT_LEDS, NULL);
     APP_ERROR_CHECK(err_code);
 }
-
+#endif
 
 /**@brief Function for initializing timers. */
 static void timers_init(void)
@@ -490,21 +495,6 @@ static void power_management_init(void)
     APP_ERROR_CHECK(err_code);
 }
 
-
-/**@brief Function for handling the idle state (main loop).
- *
- * @details If there is no pending log operation, then sleep until next the next event occurs.
- */
-static void idle_state_handle(void)
-{
-    if (NRF_LOG_PROCESS() == false)
-    {
-				uint32_t err_code;
-				err_code = sd_app_evt_wait();
-				APP_ERROR_CHECK(err_code);
-
-    }
-}
 
 /**
  * @brief Customized error handler
@@ -592,7 +582,9 @@ void csense_initialize(void)
  */
 int main(void)
 {
-		//leds_init();
+#if USE_LED_INDICATION
+		leds_init();
+#endif
 		log_init();
 		timers_init();
 		power_management_init();
