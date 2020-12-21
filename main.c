@@ -99,9 +99,9 @@ static uint32_t              m_adc_evt_counter;
 #define APP_MAJOR_VALUE                 0x01, 0x02                         /**< Major value used to identify Beacons. */
 #define APP_MINOR_VALUE                 0x03, 0x04                         /**< Minor value used to identify Beacons. */
 #define APP_BEACON_UUID                 0x01, 0x12, 0x23, 0x34, \
-                                        0x45, 0x56, 0x67, 0x78, \
-                                        0x89, 0x9a, 0xab, 0xbc, \
-                                        0xcd, 0xde, 0xef, 0xf0            /**< Proprietary UUID for Beacon. */
+  0x45, 0x56, 0x67, 0x78, \
+0x89, 0x9a, 0xab, 0xbc, \
+0xcd, 0xde, 0xef, 0xf0            /**< Proprietary UUID for Beacon. */
 
 #define DEAD_BEEF                       0xDEADBEEF                         /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
@@ -116,22 +116,22 @@ static uint32_t              m_adc_evt_counter;
 
 // Macros for capacitive sensing START
 
- #define APP_TIMER_TICKS_TIMEOUT APP_TIMER_TICKS(3000)
- #define AIN_1                   1
- #define AIN_2                   2
- #define AIN_7                   7
- #define PAD_1_MASK              (1UL << AIN_1)
- #define PAD_2_MASK              (1UL << AIN_7)
- #define PAD_ID_0                0
- #define PAD_ID_1                1
-	/* Pin used to measure capacitor charging time. */
-	#if USE_COMP == 0
-	#ifdef ADC_PRESENT
-	#define CHARGE_OUTPUT_PIN 30
-	#elif defined(SAADC_PRESENT)
-	#define CHARGE_OUTPUT_PIN 26
-	#endif
-	#endif
+#define APP_TIMER_TICKS_TIMEOUT APP_TIMER_TICKS(3000)
+#define AIN_1                   1
+#define AIN_2                   2
+#define AIN_7                   7
+#define PAD_1_MASK              (1UL << AIN_1)
+#define PAD_2_MASK              (1UL << AIN_7)
+#define PAD_ID_0                0
+#define PAD_ID_1                1
+/* Pin used to measure capacitor charging time. */
+#if USE_COMP == 0
+#ifdef ADC_PRESENT
+#define CHARGE_OUTPUT_PIN 30
+#elif defined(SAADC_PRESENT)
+#define CHARGE_OUTPUT_PIN 26
+#endif
+#endif
 
 // Macros for capacitive sensing END
 
@@ -144,49 +144,49 @@ static bool m_adv_ready_flag;
 /**@brief Struct that contains pointers to the encoded advertising data. */
 static ble_gap_adv_data_t m_adv_data =
 {
-    .adv_data =
-    {
-        .p_data = m_enc_advdata,
-        .len    = BLE_GAP_ADV_SET_DATA_SIZE_MAX
-    },
-    .scan_rsp_data =
-    {
-        .p_data = NULL,
-        .len    = 0
+  .adv_data =
+  {
+    .p_data = m_enc_advdata,
+    .len    = BLE_GAP_ADV_SET_DATA_SIZE_MAX
+  },
+  .scan_rsp_data =
+  {
+    .p_data = NULL,
+    .len    = 0
 
-    }
+  }
 };
 
 /*
 // Information advertised by the Beacon. 
 static uint8_t m_beacon_info[APP_BEACON_INFO_LENGTH] =          
 {
-    APP_DEVICE_TYPE,     // Manufacturer specific information. Specifies the device type in this
-                         // implementation.
-    APP_ADV_DATA_LENGTH, // Manufacturer specific information. Specifies the length of the
-                         // manufacturer specific data in this implementation.
-    APP_BEACON_UUID,     // 128 bit UUID value.
-    APP_MAJOR_VALUE,     // Major arbitrary value that can be used to distinguish between Beacons.
-    APP_MINOR_VALUE,     // Minor arbitrary value that can be used to distinguish between Beacons.
-    APP_MEASURED_RSSI    // Manufacturer specific information. The Beacon's measured TX power in
-                         // this implementation.
+APP_DEVICE_TYPE,     // Manufacturer specific information. Specifies the device type in this
+// implementation.
+APP_ADV_DATA_LENGTH, // Manufacturer specific information. Specifies the length of the
+// manufacturer specific data in this implementation.
+APP_BEACON_UUID,     // 128 bit UUID value.
+APP_MAJOR_VALUE,     // Major arbitrary value that can be used to distinguish between Beacons.
+APP_MINOR_VALUE,     // Minor arbitrary value that can be used to distinguish between Beacons.
+APP_MEASURED_RSSI    // Manufacturer specific information. The Beacon's measured TX power in
+// this implementation.
 };
 */
 
 #define MOISTURE_DATA_LENGTH 2
 static uint8_t m_moisture_level[MOISTURE_DATA_LENGTH] = 
 {
-		0x00,
-		0x00
+  0x00,
+  0x00
 };
 
 // Converts a 16-bit value to an array of two 8-bit values and places it in dest
 static void convert16to8(uint16_t src, uint8_t * dest)
 {
-	//NRF_LOG_INFO("CONVERTING %d .....",src);
-	dest[0] = (uint8_t) (src >> 8);
-	dest[1] = (uint8_t) (src);
-	//NRF_LOG_INFO("...TO [%d , %d]",dest[0],dest[1]);
+  //NRF_LOG_INFO("CONVERTING %d .....",src);
+  dest[0] = (uint8_t) (src >> 8);
+  dest[1] = (uint8_t) (src);
+  //NRF_LOG_INFO("...TO [%d , %d]",dest[0],dest[1]);
 }
 
 /**@brief Callback function for asserts in the SoftDevice.
@@ -202,7 +202,7 @@ static void convert16to8(uint16_t src, uint8_t * dest)
  */
 void assert_nrf_callback(uint16_t line_num, const uint8_t * p_file_name)
 {
-    app_error_handler(DEAD_BEEF, line_num, p_file_name);
+  app_error_handler(DEAD_BEEF, line_num, p_file_name);
 }
 
 /**@brief Function for initializing the Advertising functionality.
@@ -212,96 +212,96 @@ void assert_nrf_callback(uint16_t line_num, const uint8_t * p_file_name)
  */
 static void advertising_init(void)
 {
-    uint32_t      err_code;
-    ble_advdata_t advdata;
-    uint8_t       flags = BLE_GAP_ADV_FLAG_BR_EDR_NOT_SUPPORTED;
+  uint32_t      err_code;
+  ble_advdata_t advdata;
+  uint8_t       flags = BLE_GAP_ADV_FLAG_BR_EDR_NOT_SUPPORTED;
 
-    ble_advdata_manuf_data_t manuf_specific_data;
+  ble_advdata_manuf_data_t manuf_specific_data;
 
-    manuf_specific_data.company_identifier = APP_COMPANY_IDENTIFIER;
+  manuf_specific_data.company_identifier = APP_COMPANY_IDENTIFIER;
 
 #if defined(USE_UICR_FOR_MAJ_MIN_VALUES)
-    // If USE_UICR_FOR_MAJ_MIN_VALUES is defined, the major and minor values will be read from the
-    // UICR instead of using the default values. The major and minor values obtained from the UICR
-    // are encoded into advertising data in big endian order (MSB First).
-    // To set the UICR used by this example to a desired value, write to the address 0x10001080
-    // using the nrfjprog tool. The command to be used is as follows.
-    // nrfjprog --snr <Segger-chip-Serial-Number> --memwr 0x10001080 --val <your major/minor value>
-    // For example, for a major value and minor value of 0xabcd and 0x0102 respectively, the
-    // the following command should be used.
-    // nrfjprog --snr <Segger-chip-Serial-Number> --memwr 0x10001080 --val 0xabcd0102
-    uint16_t major_value = ((*(uint32_t *)UICR_ADDRESS) & 0xFFFF0000) >> 16;
-    uint16_t minor_value = ((*(uint32_t *)UICR_ADDRESS) & 0x0000FFFF);
+  // If USE_UICR_FOR_MAJ_MIN_VALUES is defined, the major and minor values will be read from the
+  // UICR instead of using the default values. The major and minor values obtained from the UICR
+  // are encoded into advertising data in big endian order (MSB First).
+  // To set the UICR used by this example to a desired value, write to the address 0x10001080
+  // using the nrfjprog tool. The command to be used is as follows.
+  // nrfjprog --snr <Segger-chip-Serial-Number> --memwr 0x10001080 --val <your major/minor value>
+  // For example, for a major value and minor value of 0xabcd and 0x0102 respectively, the
+  // the following command should be used.
+  // nrfjprog --snr <Segger-chip-Serial-Number> --memwr 0x10001080 --val 0xabcd0102
+  uint16_t major_value = ((*(uint32_t *)UICR_ADDRESS) & 0xFFFF0000) >> 16;
+  uint16_t minor_value = ((*(uint32_t *)UICR_ADDRESS) & 0x0000FFFF);
 
-    uint8_t index = MAJ_VAL_OFFSET_IN_BEACON_INFO;
+  uint8_t index = MAJ_VAL_OFFSET_IN_BEACON_INFO;
 
-    m_beacon_info[index++] = MSB_16(major_value);
-    m_beacon_info[index++] = LSB_16(major_value);
+  m_beacon_info[index++] = MSB_16(major_value);
+  m_beacon_info[index++] = LSB_16(major_value);
 
-    m_beacon_info[index++] = MSB_16(minor_value);
-    m_beacon_info[index++] = LSB_16(minor_value);
+  m_beacon_info[index++] = MSB_16(minor_value);
+  m_beacon_info[index++] = LSB_16(minor_value);
 #endif
 
-    manuf_specific_data.data.p_data = (uint8_t *) m_moisture_level;
-    manuf_specific_data.data.size   = MOISTURE_DATA_LENGTH;//APP_BEACON_INFO_LENGTH;
+  manuf_specific_data.data.p_data = (uint8_t *) m_moisture_level;
+  manuf_specific_data.data.size   = MOISTURE_DATA_LENGTH;//APP_BEACON_INFO_LENGTH;
 
-    // Build and set advertising data.
-    memset(&advdata, 0, sizeof(advdata));
+  // Build and set advertising data.
+  memset(&advdata, 0, sizeof(advdata));
 
-    advdata.name_type             = BLE_ADVDATA_NO_NAME;
-    advdata.flags                 = flags;
-    advdata.p_manuf_specific_data = &manuf_specific_data;
+  advdata.name_type             = BLE_ADVDATA_NO_NAME;
+  advdata.flags                 = flags;
+  advdata.p_manuf_specific_data = &manuf_specific_data;
 
-    // Initialize advertising parameters (used when starting advertising).
-    memset(&m_adv_params, 0, sizeof(m_adv_params));
+  // Initialize advertising parameters (used when starting advertising).
+  memset(&m_adv_params, 0, sizeof(m_adv_params));
 
-    m_adv_params.properties.type = BLE_GAP_ADV_TYPE_NONCONNECTABLE_NONSCANNABLE_UNDIRECTED;
-    m_adv_params.p_peer_addr     = NULL;    // Undirected advertisement.
-    m_adv_params.filter_policy   = BLE_GAP_ADV_FP_ANY;
-    m_adv_params.interval        = NON_CONNECTABLE_ADV_INTERVAL;
-    m_adv_params.duration        = ADV_TIMEOUT/10;
+  m_adv_params.properties.type = BLE_GAP_ADV_TYPE_NONCONNECTABLE_NONSCANNABLE_UNDIRECTED;
+  m_adv_params.p_peer_addr     = NULL;    // Undirected advertisement.
+  m_adv_params.filter_policy   = BLE_GAP_ADV_FP_ANY;
+  m_adv_params.interval        = NON_CONNECTABLE_ADV_INTERVAL;
+  m_adv_params.duration        = ADV_TIMEOUT/10;
 
-    err_code = ble_advdata_encode(&advdata, m_adv_data.adv_data.p_data, &m_adv_data.adv_data.len);
-    APP_ERROR_CHECK(err_code);
+  err_code = ble_advdata_encode(&advdata, m_adv_data.adv_data.p_data, &m_adv_data.adv_data.len);
+  APP_ERROR_CHECK(err_code);
 
-    err_code = sd_ble_gap_adv_set_configure(&m_adv_handle, &m_adv_data, &m_adv_params);
-    APP_ERROR_CHECK(err_code);
+  err_code = sd_ble_gap_adv_set_configure(&m_adv_handle, &m_adv_data, &m_adv_params);
+  APP_ERROR_CHECK(err_code);
 }
 
 
 /**@brief Function for starting advertising.
- */
+*/
 static void advertising_start(void)
 {
-    ret_code_t err_code;
-    err_code = sd_ble_gap_adv_start(m_adv_handle, APP_BLE_CONN_CFG_TAG);
-		APP_ERROR_CHECK(err_code);
-    //err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING);
-    //APP_ERROR_CHECK(err_code);
+  ret_code_t err_code;
+  err_code = sd_ble_gap_adv_start(m_adv_handle, APP_BLE_CONN_CFG_TAG);
+  APP_ERROR_CHECK(err_code);
+  //err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING);
+  //APP_ERROR_CHECK(err_code);
 }
 
 /*
-static void advertising_stop(void)
-{
-	ret_code_t err_code;
-	err_code = sd_ble_gap_adv_stop(m_adv_handle);
-	APP_ERROR_CHECK(err_code);
-}
-*/
+   static void advertising_stop(void)
+   {
+   ret_code_t err_code;
+   err_code = sd_ble_gap_adv_stop(m_adv_handle);
+   APP_ERROR_CHECK(err_code);
+   }
+   */
 
 static void ble_hids_on_ble_evt(ble_evt_t const *p_ble_evt, void *p_context)
 {
-	switch (p_ble_evt->header.evt_id)
-	{
-			case BLE_GAP_EVT_TIMEOUT:
-					m_adv_ready_flag = true;
-					nrf_drv_gpiote_out_toggle(LED_3);
-					advertising_start();
-					break; // BLE_GAP_EVT_TIMEOUT
-			default:
-					// No implementation needed.
-					break;
-	}
+  switch (p_ble_evt->header.evt_id)
+  {
+    case BLE_GAP_EVT_TIMEOUT:
+      m_adv_ready_flag = true;
+      nrf_drv_gpiote_out_toggle(LED_3);
+      advertising_start();
+      break; // BLE_GAP_EVT_TIMEOUT
+    default:
+      // No implementation needed.
+      break;
+  }
 }
 
 NRF_SDH_BLE_OBSERVER(m_ble_observer, BLE_HIDS_BLE_OBSERVER_PRIO, ble_hids_on_ble_evt, NULL);
@@ -312,20 +312,20 @@ NRF_SDH_BLE_OBSERVER(m_ble_observer, BLE_HIDS_BLE_OBSERVER_PRIO, ble_hids_on_ble
  */
 static void ble_stack_init(void)
 {
-    ret_code_t err_code;
+  ret_code_t err_code;
 
-    err_code = nrf_sdh_enable_request();
-    APP_ERROR_CHECK(err_code);
+  err_code = nrf_sdh_enable_request();
+  APP_ERROR_CHECK(err_code);
 
-    // Configure the BLE stack using the default settings.
-    // Fetch the start address of the application RAM.
-    uint32_t ram_start = 0;
-    err_code = nrf_sdh_ble_default_cfg_set(APP_BLE_CONN_CFG_TAG, &ram_start);
-    APP_ERROR_CHECK(err_code);
+  // Configure the BLE stack using the default settings.
+  // Fetch the start address of the application RAM.
+  uint32_t ram_start = 0;
+  err_code = nrf_sdh_ble_default_cfg_set(APP_BLE_CONN_CFG_TAG, &ram_start);
+  APP_ERROR_CHECK(err_code);
 
-    // Enable BLE stack.
-    err_code = nrf_sdh_ble_enable(&ram_start);
-    APP_ERROR_CHECK(err_code);
+  // Enable BLE stack.
+  err_code = nrf_sdh_ble_enable(&ram_start);
+  APP_ERROR_CHECK(err_code);
 
 }
 
@@ -352,107 +352,107 @@ void timer_handler(nrf_timer_event_t event_type, void * p_context)
 
 void saadc_sampling_event_init(void)
 {
-    ret_code_t err_code;
+  ret_code_t err_code;
 
-    err_code = nrf_drv_ppi_init();
-    APP_ERROR_CHECK(err_code);
+  err_code = nrf_drv_ppi_init();
+  APP_ERROR_CHECK(err_code);
 
-		// RTC SETUP
-    nrfx_rtc_config_t rtc_config = NRFX_RTC_DEFAULT_CONFIG;
-		rtc_config.prescaler = 4095; // Set prescaler to 4095 -> frequency = 8 Hz
-    rtc_config.interrupt_priority = NRFX_RTC_DEFAULT_CONFIG_IRQ_PRIORITY;
-    rtc_config.reliable = NRFX_RTC_DEFAULT_CONFIG_RELIABLE;                  
-    rtc_config.tick_latency = NRFX_RTC_US_TO_TICKS(NRFX_RTC_MAXIMUM_LATENCY_US,NRFX_RTC_DEFAULT_CONFIG_FREQUENCY);
-    err_code = nrfx_rtc_init(&m_rtc, &rtc_config, rtc_handler);
-    APP_ERROR_CHECK(err_code);
-    //Set compare channel 0 to trigger when value reaches 8 -> at 1 Hz
-    err_code = nrfx_rtc_cc_set(&m_rtc,0,40,false);
-    APP_ERROR_CHECK(err_code);
-		
-		//Power on RTC instance
-		nrfx_rtc_enable(&m_rtc);
-    
-    uint32_t rtc_compare_event_addr = nrfx_rtc_event_address_get(&m_rtc, NRF_RTC_EVENT_COMPARE_0);
-    uint32_t rtc_clear_task_addr = nrfx_rtc_task_address_get(&m_rtc, NRF_RTC_TASK_CLEAR);
-    uint32_t saadc_sample_event_addr = nrfx_saadc_sample_task_get();
+  // RTC SETUP
+  nrfx_rtc_config_t rtc_config = NRFX_RTC_DEFAULT_CONFIG;
+  rtc_config.prescaler = 4095; // Set prescaler to 4095 -> frequency = 8 Hz
+  rtc_config.interrupt_priority = NRFX_RTC_DEFAULT_CONFIG_IRQ_PRIORITY;
+  rtc_config.reliable = NRFX_RTC_DEFAULT_CONFIG_RELIABLE;                  
+  rtc_config.tick_latency = NRFX_RTC_US_TO_TICKS(NRFX_RTC_MAXIMUM_LATENCY_US,NRFX_RTC_DEFAULT_CONFIG_FREQUENCY);
+  err_code = nrfx_rtc_init(&m_rtc, &rtc_config, rtc_handler);
+  APP_ERROR_CHECK(err_code);
+  //Set compare channel 0 to trigger when value reaches 8 -> at 1 Hz
+  err_code = nrfx_rtc_cc_set(&m_rtc,0,40,false);
+  APP_ERROR_CHECK(err_code);
 
-		/* Setup ppi channel so that: RTC COMPARE -> TASK: sampling in SAADC + FORK: RTC clear*/
-    err_code = nrfx_ppi_channel_alloc(&m_ppi_channel);
-    APP_ERROR_CHECK(err_code);
-		//nrfx_ppi_channel_assign(ppi_channel, event, task_to_activate_during_event);
-		err_code = nrfx_ppi_channel_assign(m_ppi_channel, rtc_compare_event_addr, saadc_sample_event_addr);
-		APP_ERROR_CHECK(err_code);
-		// Assign a second task, i.e. a "fork" to be executed in addition to primary task
-		err_code = nrfx_ppi_channel_fork_assign(m_ppi_channel, rtc_clear_task_addr);
-		APP_ERROR_CHECK(err_code);
+  //Power on RTC instance
+  nrfx_rtc_enable(&m_rtc);
+
+  uint32_t rtc_compare_event_addr = nrfx_rtc_event_address_get(&m_rtc, NRF_RTC_EVENT_COMPARE_0);
+  uint32_t rtc_clear_task_addr = nrfx_rtc_task_address_get(&m_rtc, NRF_RTC_TASK_CLEAR);
+  uint32_t saadc_sample_event_addr = nrfx_saadc_sample_task_get();
+
+  /* Setup ppi channel so that: RTC COMPARE -> TASK: sampling in SAADC + FORK: RTC clear*/
+  err_code = nrfx_ppi_channel_alloc(&m_ppi_channel);
+  APP_ERROR_CHECK(err_code);
+  //nrfx_ppi_channel_assign(ppi_channel, event, task_to_activate_during_event);
+  err_code = nrfx_ppi_channel_assign(m_ppi_channel, rtc_compare_event_addr, saadc_sample_event_addr);
+  APP_ERROR_CHECK(err_code);
+  // Assign a second task, i.e. a "fork" to be executed in addition to primary task
+  err_code = nrfx_ppi_channel_fork_assign(m_ppi_channel, rtc_clear_task_addr);
+  APP_ERROR_CHECK(err_code);
 }
 
 
 void saadc_sampling_event_enable(void)
 {
-    ret_code_t err_code = nrfx_ppi_channel_enable(m_ppi_channel);
+  ret_code_t err_code = nrfx_ppi_channel_enable(m_ppi_channel);
 
-    APP_ERROR_CHECK(err_code);
+  APP_ERROR_CHECK(err_code);
 }
 
 
 void saadc_callback(nrfx_saadc_evt_t const * p_event)
 {
-    if (p_event->type == NRFX_SAADC_EVT_DONE)
-    {
-        ret_code_t err_code;
+  if (p_event->type == NRFX_SAADC_EVT_DONE)
+  {
+    ret_code_t err_code;
 
-        err_code = nrfx_saadc_buffer_convert(p_event->data.done.p_buffer, SAMPLES_IN_BUFFER);
-        APP_ERROR_CHECK(err_code);
+    err_code = nrfx_saadc_buffer_convert(p_event->data.done.p_buffer, SAMPLES_IN_BUFFER);
+    APP_ERROR_CHECK(err_code);
 
-        int i;
-        //NRF_LOG_INFO("ADC event number: %d", (int)m_adc_evt_counter);
+    int i;
+    //NRF_LOG_INFO("ADC event number: %d", (int)m_adc_evt_counter);
 
-        for (i = 0; i < SAMPLES_IN_BUFFER; i++)
-        {			 
-						convert16to8((uint16_t)p_event->data.done.p_buffer[i], m_moisture_level);
-            //NRF_LOG_INFO("%d", p_event->data.done.p_buffer[i]);
-        }
-        m_adc_evt_counter++;
+    for (i = 0; i < SAMPLES_IN_BUFFER; i++)
+    {			 
+      convert16to8((uint16_t)p_event->data.done.p_buffer[i], m_moisture_level);
+      //NRF_LOG_INFO("%d", p_event->data.done.p_buffer[i]);
     }
-		//nrf_drv_gpiote_out_toggle(LED_3);
-		advertising_init();
-		advertising_start();
+    m_adc_evt_counter++;
+  }
+  //nrf_drv_gpiote_out_toggle(LED_3);
+  advertising_init();
+  advertising_start();
 }
 
 
 void saadc_init(void)
 {
-		ret_code_t err_code;
-		
-		nrfx_saadc_config_t saadc_config;
-		saadc_config.resolution = NRF_SAADC_RESOLUTION_12BIT;                                 
-		saadc_config.oversample = NRF_SAADC_OVERSAMPLE_8X;
-		saadc_config.interrupt_priority = APP_IRQ_PRIORITY_LOW;
-		saadc_config.low_power_mode = true;
+  ret_code_t err_code;
 
-		nrf_saadc_channel_config_t channel_config; //= NRFX_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN0);
-    channel_config.resistor_p = NRF_SAADC_RESISTOR_DISABLED;
-    channel_config.resistor_n = NRF_SAADC_RESISTOR_DISABLED;
-    channel_config.gain       = NRF_SAADC_GAIN1_6;
-    channel_config.reference  = NRF_SAADC_REFERENCE_INTERNAL;
-    channel_config.acq_time   = NRF_SAADC_ACQTIME_10US;
-    channel_config.mode       = NRF_SAADC_MODE_SINGLE_ENDED;
-		channel_config.burst      = NRF_SAADC_BURST_ENABLED; // If ON: Executes all Oversample times as quickly as possible on each activation
-    channel_config.pin_p      = NRF_SAADC_INPUT_AIN0;
-    channel_config.pin_n      = NRF_SAADC_INPUT_DISABLED;
-		
-		err_code = nrfx_saadc_init(&saadc_config, saadc_callback);
-		APP_ERROR_CHECK(err_code);
+  nrfx_saadc_config_t saadc_config;
+  saadc_config.resolution = NRF_SAADC_RESOLUTION_12BIT;                                 
+  saadc_config.oversample = NRF_SAADC_OVERSAMPLE_8X;
+  saadc_config.interrupt_priority = APP_IRQ_PRIORITY_LOW;
+  saadc_config.low_power_mode = true;
 
-		err_code = nrfx_saadc_channel_init(0, &channel_config);
-		APP_ERROR_CHECK(err_code);
+  nrf_saadc_channel_config_t channel_config; //= NRFX_SAADC_DEFAULT_CHANNEL_CONFIG_SE(NRF_SAADC_INPUT_AIN0);
+  channel_config.resistor_p = NRF_SAADC_RESISTOR_DISABLED;
+  channel_config.resistor_n = NRF_SAADC_RESISTOR_DISABLED;
+  channel_config.gain       = NRF_SAADC_GAIN1_6;
+  channel_config.reference  = NRF_SAADC_REFERENCE_INTERNAL;
+  channel_config.acq_time   = NRF_SAADC_ACQTIME_10US;
+  channel_config.mode       = NRF_SAADC_MODE_SINGLE_ENDED;
+  channel_config.burst      = NRF_SAADC_BURST_ENABLED; // If ON: Executes all Oversample times as quickly as possible on each activation
+  channel_config.pin_p      = NRF_SAADC_INPUT_AIN0;
+  channel_config.pin_n      = NRF_SAADC_INPUT_DISABLED;
 
-		err_code = nrfx_saadc_buffer_convert(m_buffer_pool[0], SAMPLES_IN_BUFFER);
-		APP_ERROR_CHECK(err_code);
+  err_code = nrfx_saadc_init(&saadc_config, saadc_callback);
+  APP_ERROR_CHECK(err_code);
 
-		err_code = nrfx_saadc_buffer_convert(m_buffer_pool[1], SAMPLES_IN_BUFFER); // "Extra" buffer to write to when buffer 1 is full
-		APP_ERROR_CHECK(err_code);
+  err_code = nrfx_saadc_channel_init(0, &channel_config);
+  APP_ERROR_CHECK(err_code);
+
+  err_code = nrfx_saadc_buffer_convert(m_buffer_pool[0], SAMPLES_IN_BUFFER);
+  APP_ERROR_CHECK(err_code);
+
+  err_code = nrfx_saadc_buffer_convert(m_buffer_pool[1], SAMPLES_IN_BUFFER); // "Extra" buffer to write to when buffer 1 is full
+  APP_ERROR_CHECK(err_code);
 }
 
 
@@ -462,37 +462,37 @@ void saadc_init(void)
 /**@brief Function for initializing logging. */
 static void log_init(void)
 {
-    ret_code_t err_code = NRF_LOG_INIT(NULL);
-    APP_ERROR_CHECK(err_code);
+  ret_code_t err_code = NRF_LOG_INIT(NULL);
+  APP_ERROR_CHECK(err_code);
 
-    NRF_LOG_DEFAULT_BACKENDS_INIT();
-	
+  NRF_LOG_DEFAULT_BACKENDS_INIT();
+
 }
 
 #if USE_LED_INDICATION
 /**@brief Function for initializing LEDs. */
 static void leds_init(void)
 {
-    ret_code_t err_code = bsp_init(BSP_INIT_LEDS, NULL);
-    APP_ERROR_CHECK(err_code);
+  ret_code_t err_code = bsp_init(BSP_INIT_LEDS, NULL);
+  APP_ERROR_CHECK(err_code);
 }
 #endif
 
 /**@brief Function for initializing timers. */
 static void timers_init(void)
 {
-    ret_code_t err_code = app_timer_init();
-    APP_ERROR_CHECK(err_code);
+  ret_code_t err_code = app_timer_init();
+  APP_ERROR_CHECK(err_code);
 }
 
 
 /**@brief Function for initializing power management.
- */
+*/
 static void power_management_init(void)
 {
-    ret_code_t err_code;
-    err_code = nrf_pwr_mgmt_init();
-    APP_ERROR_CHECK(err_code);
+  ret_code_t err_code;
+  err_code = nrf_pwr_mgmt_init();
+  APP_ERROR_CHECK(err_code);
 }
 
 
@@ -502,36 +502,36 @@ static void power_management_init(void)
 
 void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
 {
-	//NRF_LOG_INFO("ERROR on line %d, pc: %d, info: %d", id, pc, info);
+  //NRF_LOG_INFO("ERROR on line %d, pc: %d, info: %d", id, pc, info);
 }
 
 // Capacitive sensing START
 
 
- static void csense_timeout_handler(void * p_context)
+static void csense_timeout_handler(void * p_context)
 {
-    ret_code_t err_code;
+  ret_code_t err_code;
 
-    err_code = nrf_drv_csense_sample();
-    if (err_code != NRF_SUCCESS)
-    {
-        NRF_LOG_INFO("Busy.\r\n");
-        return;
-    }
+  err_code = nrf_drv_csense_sample();
+  if (err_code != NRF_SUCCESS)
+  {
+    NRF_LOG_INFO("Busy.\r\n");
+    return;
+  }
 }
 
-  void start_app_timer(void)
+void start_app_timer(void)
 {
-    ret_code_t err_code;
+  ret_code_t err_code;
 
-    /* APP_TIMER definition for csense example. */
-    APP_TIMER_DEF(timer_0);
+  /* APP_TIMER definition for csense example. */
+  APP_TIMER_DEF(timer_0);
 
-    err_code = app_timer_create(&timer_0, APP_TIMER_MODE_REPEATED, csense_timeout_handler);
-    APP_ERROR_CHECK(err_code);
+  err_code = app_timer_create(&timer_0, APP_TIMER_MODE_REPEATED, csense_timeout_handler);
+  APP_ERROR_CHECK(err_code);
 
-    err_code = app_timer_start(timer_0, APP_TIMER_TICKS_TIMEOUT, NULL);
-    APP_ERROR_CHECK(err_code);
+  err_code = app_timer_start(timer_0, APP_TIMER_TICKS_TIMEOUT, NULL);
+  APP_ERROR_CHECK(err_code);
 }
 
 
@@ -539,39 +539,38 @@ void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
 
 void csense_handler(nrf_drv_csense_evt_t * p_event_struct)
 {
-    switch (p_event_struct->analog_channel)
-    {
-        case AIN_1:
-        case AIN_2:
-                 //NRF_LOG_INFO("t:%d\r\n",p_event_struct->read_value);
-                 break;
-        case AIN_7:
-							NRF_LOG_INFO("t:%d\r\n",p_event_struct->read_value);
-              convert16to8(p_event_struct->read_value, m_moisture_level);
-							advertising_init();
-							advertising_start();
-							break;
- 
-        default:
-            break;
-    }
-}
+  switch (p_event_struct->analog_channel)
+  {
+    case AIN_1:
+    case AIN_2:
+      //NRF_LOG_INFO("t:%d\r\n",p_event_struct->read_value);
+      break;
+    case AIN_7:
+      NRF_LOG_INFO("t:%d\r\n",p_event_struct->read_value);
+      convert16to8(p_event_struct->read_value, m_moisture_level);
+      advertising_init();
+      advertising_start();
+      break;
 
+    default:
+      break;
+  }
+}
 
 void csense_initialize(void)
 {
-    ret_code_t err_code;
+  ret_code_t err_code;
 
-    nrf_drv_csense_config_t csense_config = { 0 };
+  nrf_drv_csense_config_t csense_config = { 0 };
 
 #if USE_COMP == 0
-    csense_config.output_pin = CHARGE_OUTPUT_PIN;
+  csense_config.output_pin = CHARGE_OUTPUT_PIN;
 #endif
 
-    err_code = nrf_drv_csense_init(&csense_config, csense_handler);
-    APP_ERROR_CHECK(err_code);
+  err_code = nrf_drv_csense_init(&csense_config, csense_handler);
+  APP_ERROR_CHECK(err_code);
 
-    nrf_drv_csense_channels_enable(PAD_2_MASK);
+  nrf_drv_csense_channels_enable(PAD_2_MASK);
 }
 
 // Capacitive sensing END
@@ -583,21 +582,21 @@ void csense_initialize(void)
 int main(void)
 {
 #if USE_LED_INDICATION
-		leds_init();
+  leds_init();
 #endif
-		log_init();
-		timers_init();
-		power_management_init();
-		ble_stack_init();
-		csense_initialize();
-		start_app_timer();
-		advertising_init();
-    advertising_start();	
-    while (1)
-    {
-        nrf_pwr_mgmt_run();
-        NRF_LOG_FLUSH();
-    }
+  log_init();
+  timers_init();
+  power_management_init();
+  ble_stack_init();
+  csense_initialize();
+  start_app_timer();
+  advertising_init();
+  advertising_start();	
+  while (1)
+  {
+    nrf_pwr_mgmt_run();
+    NRF_LOG_FLUSH();
+  }
 }
 
 
