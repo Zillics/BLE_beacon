@@ -183,10 +183,8 @@ static uint8_t m_moisture_level[MOISTURE_DATA_LENGTH] =
 // Converts a 16-bit value to an array of two 8-bit values and places it in dest
 static void convert16to8(uint16_t src, uint8_t * dest)
 {
-  //NRF_LOG_INFO("CONVERTING %d .....",src);
-  dest[0] = (uint8_t) (src >> 8);
-  dest[1] = (uint8_t) (src);
-  //NRF_LOG_INFO("...TO [%d , %d]",dest[0],dest[1]);
+  dest[0] = (uint8_t) (src);
+  dest[1] = (uint8_t) (src >> 8);
 }
 
 /**@brief Callback function for asserts in the SoftDevice.
@@ -241,7 +239,12 @@ static void advertising_init(void)
   m_beacon_info[index++] = MSB_16(minor_value);
   m_beacon_info[index++] = LSB_16(minor_value);
 #endif
-
+  // TESTING
+  //
+  uint16_t testValue = 667;
+  convert16to8(testValue, m_moisture_level);
+  //
+  // TESTING ENDS
   manuf_specific_data.data.p_data = (uint8_t *) m_moisture_level;
   manuf_specific_data.data.size   = MOISTURE_DATA_LENGTH;//APP_BEACON_INFO_LENGTH;
 
