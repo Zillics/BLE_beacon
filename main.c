@@ -120,18 +120,10 @@ static uint32_t              m_adc_evt_counter;
 #define AIN_1                   1
 #define AIN_2                   2
 #define AIN_7                   7
-#define PAD_1_MASK              (1UL << AIN_1)
-#define PAD_2_MASK              (1UL << AIN_7)
-#define PAD_ID_0                0
-#define PAD_ID_1                1
-/* Pin used to measure capacitor charging time. */
-#if USE_COMP == 0
-#ifdef ADC_PRESENT
-#define CHARGE_OUTPUT_PIN 30
-#elif defined(SAADC_PRESENT)
+#define ELECTRODE_PIN           AIN_2
+#define CAP_PAD_MASK            (1UL << AIN_2)
+/** Pin on which to generate voltage for charging the capacitors used for measuring capacitance */
 #define CHARGE_OUTPUT_PIN 26
-#endif
-#endif
 
 // Macros for capacitive sensing END
 
@@ -239,12 +231,6 @@ static void advertising_init(void)
   m_beacon_info[index++] = MSB_16(minor_value);
   m_beacon_info[index++] = LSB_16(minor_value);
 #endif
-  // TESTING
-  //
-  uint16_t testValue = 667;
-  convert16to8(testValue, m_moisture_level);
-  //
-  // TESTING ENDS
   manuf_specific_data.data.p_data = (uint8_t *) m_moisture_level;
   manuf_specific_data.data.size   = MOISTURE_DATA_LENGTH;//APP_BEACON_INFO_LENGTH;
 
@@ -442,7 +428,7 @@ void saadc_init(void)
   channel_config.acq_time   = NRF_SAADC_ACQTIME_10US;
   channel_config.mode       = NRF_SAADC_MODE_SINGLE_ENDED;
   channel_config.burst      = NRF_SAADC_BURST_ENABLED; // If ON: Executes all Oversample times as quickly as possible on each activation
-  channel_config.pin_p      = NRF_SAADC_INPUT_AIN0;
+  channel_config.pin_p      = NRF_SAADC_INPUT_AIN2;
   channel_config.pin_n      = NRF_SAADC_INPUT_DISABLED;
 
   err_code = nrfx_saadc_init(&saadc_config, saadc_callback);
@@ -461,8 +447,7 @@ void saadc_init(void)
 
 // SAADC END
 
-
-/**@brief Function for initializing logging. */
+/*
 static void log_init(void)
 {
   ret_code_t err_code = NRF_LOG_INIT(NULL);
@@ -471,9 +456,9 @@ static void log_init(void)
   NRF_LOG_DEFAULT_BACKENDS_INIT();
 
 }
+*/
 
 #if USE_LED_INDICATION
-/**@brief Function for initializing LEDs. */
 static void leds_init(void)
 {
   ret_code_t err_code = bsp_init(BSP_INIT_LEDS, NULL);
@@ -518,7 +503,6 @@ static void csense_timeout_handler(void * p_context)
   err_code = nrf_drv_csense_sample();
   if (err_code != NRF_SUCCESS)
   {
-    NRF_LOG_INFO("Busy.\r\n");
     return;
   }
 }
@@ -544,12 +528,7 @@ void csense_handler(nrf_drv_csense_evt_t * p_event_struct)
 {
   switch (p_event_struct->analog_channel)
   {
-    case AIN_1:
-    case AIN_2:
-      //NRF_LOG_INFO("t:%d\r\n",p_event_struct->read_value);
-      break;
-    case AIN_7:
-      NRF_LOG_INFO("t:%d\r\n",p_event_struct->read_value);
+    case ELECTRODE_PIN:
       convert16to8(p_event_struct->read_value, m_moisture_level);
       advertising_init();
       advertising_start();
@@ -566,14 +545,12 @@ void csense_initialize(void)
 
   nrf_drv_csense_config_t csense_config = { 0 };
 
-#if USE_COMP == 0
   csense_config.output_pin = CHARGE_OUTPUT_PIN;
-#endif
 
   err_code = nrf_drv_csense_init(&csense_config, csense_handler);
   APP_ERROR_CHECK(err_code);
 
-  nrf_drv_csense_channels_enable(PAD_2_MASK);
+  nrf_drv_csense_channels_enable(CAP_PAD_MASK);
 }
 
 // Capacitive sensing END
@@ -584,10 +561,6 @@ void csense_initialize(void)
  */
 int main(void)
 {
-#if USE_LED_INDICATION
-  leds_init();
-#endif
-  log_init();
   timers_init();
   power_management_init();
   ble_stack_init();
@@ -598,7 +571,6 @@ int main(void)
   while (1)
   {
     nrf_pwr_mgmt_run();
-    NRF_LOG_FLUSH();
   }
 }
 
