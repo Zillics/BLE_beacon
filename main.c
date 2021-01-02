@@ -78,8 +78,9 @@
 
 #define APP_BLE_CONN_CFG_TAG            1                                  /**< A tag identifying the SoftDevice BLE configuration. */
 
+/* BLE */
+#define NON_CONNECTABLE_ADV_TIMEOUT     400
 #define NON_CONNECTABLE_ADV_INTERVAL    MSEC_TO_UNITS(100, UNIT_0_625_MS)  /**< The advertising interval for non-connectable advertisement (100 ms). This value can vary between 100ms to 10.24s). */
-
 #define APP_BEACON_INFO_LENGTH          0x17                               /**< Total length of information advertised by the Beacon. */
 #define APP_ADV_DATA_LENGTH             0x15                               /**< Length of manufacturer specific data in the advertisement. */
 #define APP_DEVICE_TYPE                 0x02                               /**< 0x02 refers to Beacon. */
@@ -99,9 +100,6 @@
 #define UICR_ADDRESS                    0x10001080                         /**< Address of the UICR register used by this example. The major and minor versions to be encoded into the advertising data will be picked up from this location. */
 #endif
 
-/* BLE */
-
-#define ADV_TIMEOUT 400
 
 // Macros for capacitive sensing START
 
@@ -199,7 +197,7 @@ static void advertising_init(void)
   m_adv_params.p_peer_addr     = NULL;    // Undirected advertisement.
   m_adv_params.filter_policy   = BLE_GAP_ADV_FP_ANY;
   m_adv_params.interval        = NON_CONNECTABLE_ADV_INTERVAL;
-  m_adv_params.duration        = ADV_TIMEOUT/10;
+  m_adv_params.duration        = NON_CONNECTABLE_ADV_TIMEOUT/10;
 
   err_code = ble_advdata_encode(&advdata, m_adv_data.adv_data.p_data, &m_adv_data.adv_data.len);
   APP_ERROR_CHECK(err_code);
