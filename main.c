@@ -74,8 +74,6 @@
 // Capsense
 #include "nrf_drv_csense.h"
 
-#define USE_LED_INDICATION 0
-
 #define SAMPLES_IN_BUFFER 1
 
 #define APP_BLE_CONN_CFG_TAG            1                                  /**< A tag identifying the SoftDevice BLE configuration. */
@@ -139,22 +137,6 @@ static ble_gap_adv_data_t m_adv_data =
 
   }
 };
-
-/*
-// Information advertised by the Beacon. 
-static uint8_t m_beacon_info[APP_BEACON_INFO_LENGTH] =          
-{
-APP_DEVICE_TYPE,     // Manufacturer specific information. Specifies the device type in this
-// implementation.
-APP_ADV_DATA_LENGTH, // Manufacturer specific information. Specifies the length of the
-// manufacturer specific data in this implementation.
-APP_BEACON_UUID,     // 128 bit UUID value.
-APP_MAJOR_VALUE,     // Major arbitrary value that can be used to distinguish between Beacons.
-APP_MINOR_VALUE,     // Minor arbitrary value that can be used to distinguish between Beacons.
-APP_MEASURED_RSSI    // Manufacturer specific information. The Beacon's measured TX power in
-// this implementation.
-};
-*/
 
 #define MOISTURE_DATA_LENGTH 2
 static uint8_t m_moisture_level[MOISTURE_DATA_LENGTH] = 
@@ -256,18 +238,7 @@ static void advertising_start(void)
   ret_code_t err_code;
   err_code = sd_ble_gap_adv_start(m_adv_handle, APP_BLE_CONN_CFG_TAG);
   APP_ERROR_CHECK(err_code);
-  //err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING);
-  //APP_ERROR_CHECK(err_code);
 }
-
-/*
-   static void advertising_stop(void)
-   {
-   ret_code_t err_code;
-   err_code = sd_ble_gap_adv_stop(m_adv_handle);
-   APP_ERROR_CHECK(err_code);
-   }
-   */
 
 static void ble_hids_on_ble_evt(ble_evt_t const *p_ble_evt, void *p_context)
 {
@@ -309,27 +280,7 @@ static void ble_stack_init(void)
 
 }
 
-
 /* BLE end */
-
-/*
-static void log_init(void)
-{
-  ret_code_t err_code = NRF_LOG_INIT(NULL);
-  APP_ERROR_CHECK(err_code);
-
-  NRF_LOG_DEFAULT_BACKENDS_INIT();
-
-}
-*/
-
-#if USE_LED_INDICATION
-static void leds_init(void)
-{
-  ret_code_t err_code = bsp_init(BSP_INIT_LEDS, NULL);
-  APP_ERROR_CHECK(err_code);
-}
-#endif
 
 /**@brief Function for initializing timers. */
 static void timers_init(void)
@@ -352,11 +303,6 @@ static void power_management_init(void)
 /**
  * @brief Customized error handler
  */
-
-void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info)
-{
-  //NRF_LOG_INFO("ERROR on line %d, pc: %d, info: %d", id, pc, info);
-}
 
 // Capacitive sensing START
 
