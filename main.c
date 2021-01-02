@@ -118,8 +118,6 @@ static ble_gap_adv_params_t m_adv_params;                                  /**< 
 static uint8_t              m_adv_handle = BLE_GAP_ADV_SET_HANDLE_NOT_SET; /**< Advertising handle used to identify an advertising set. */
 static uint8_t              m_enc_advdata[BLE_GAP_ADV_SET_DATA_SIZE_MAX];  /**< Buffer for storing an encoded advertising set. */
 
-static bool m_adv_ready_flag;
-
 /**@brief Struct that contains pointers to the encoded advertising data. */
 static ble_gap_adv_data_t m_adv_data =
 {
@@ -215,23 +213,6 @@ static void advertising_start(void)
   err_code = sd_ble_gap_adv_start(m_adv_handle, APP_BLE_CONN_CFG_TAG);
   APP_ERROR_CHECK(err_code);
 }
-
-static void ble_hids_on_ble_evt(ble_evt_t const *p_ble_evt, void *p_context)
-{
-  switch (p_ble_evt->header.evt_id)
-  {
-    case BLE_GAP_EVT_TIMEOUT:
-      m_adv_ready_flag = true;
-      nrf_drv_gpiote_out_toggle(LED_3);
-      advertising_start();
-      break; // BLE_GAP_EVT_TIMEOUT
-    default:
-      // No implementation needed.
-      break;
-  }
-}
-
-NRF_SDH_BLE_OBSERVER(m_ble_observer, BLE_HIDS_BLE_OBSERVER_PRIO, ble_hids_on_ble_evt, NULL);
 
 /**@brief Function for initializing the BLE stack.
  *
