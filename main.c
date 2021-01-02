@@ -74,6 +74,9 @@
 // Capsense
 #include "nrf_drv_csense.h"
 
+// Services
+#include "moisture_service.h"
+
 #define SAMPLES_IN_BUFFER 1
 
 #define APP_BLE_CONN_CFG_TAG            1                                  /**< A tag identifying the SoftDevice BLE configuration. */
@@ -176,6 +179,12 @@ static void advertising_init(void)
   uint8_t       flags = BLE_GAP_ADV_FLAG_BR_EDR_NOT_SUPPORTED;
   ble_advdata_manuf_data_t manuf_specific_data;
 
+  // Setup service data
+  ble_advdata_service_data_t moisture_service;
+  moisture_service.service_uuid  = BLE_UUID_MOISTURE_SERVICE; 
+  moisture_service.data.size = MOISTURE_DATA_LENGTH; 
+  moisture_service.data.p_data = (uint8_t *) m_moisture_level;
+
   // Set manuf specific data
   manuf_specific_data.company_identifier = APP_COMPANY_IDENTIFIER;
   manuf_specific_data.data.p_data = (uint8_t *) m_moisture_level;
@@ -187,6 +196,8 @@ static void advertising_init(void)
   advdata.name_type             = BLE_ADVDATA_NO_NAME;
   advdata.flags                 = flags;
   advdata.p_manuf_specific_data = &manuf_specific_data;
+  advdata.p_service_data_array  = &moisture_service;
+  advdata.service_data_count    = 1;
 
   // Initialize advertising parameters (used when starting advertising).
   memset(&m_adv_params, 0, sizeof(m_adv_params));
