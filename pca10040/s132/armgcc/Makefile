@@ -4,6 +4,60 @@ OUTPUT_DIRECTORY := _build
 
 SDK_ROOT := ../../../../../..
 PROJ_DIR := ../../..
+DBG_BUILD_DIR := ./_build
+
+# JLINK_MON_DEBUG_DIR should point to the directory that contains the files
+# in JLINK_MON_DEBUG_FILES plus JLINK_MONITOR.h. If Monitor Mode Debugging is
+# not required then leave JLINK_MON_DEBUG_DIR empty.
+JLINK_MON_DEBUG_DIR := 
+
+# The offset of the application needs to be specified so the J-Link knows
+# the location of the DebugMon_Handler. For the S132 v5 this is 0x23000.
+JLINK_MON_DEBUG_APP_FLASH_LOCATION := 0x23000
+
+# If the JLINK_MON_DEBUG_DIR is empty then make sure it is evaluated correctly.
+JLINK_MON_DEBUG_DIR := $(strip $(JLINK_MON_DEBUG_DIR))
+
+# These are the required files as of version 6.12a of the J-Link driver.
+JLINK_MON_DEBUG_FILES := JLINK_MONITOR.c JLINK_MONITOR_ISR_SES.s
+
+# Init commands will be written to a file and then specified when starting GDB
+# instead of relying on .gdbinit (to avoid having to enable .gbdinit files).
+GDB_CMD_PATH := $(DBG_BUILD_DIR)/gdb.txt
+
+SD_HEX_PATH := $(SDK_ROOT)/components/softdevice/s132/hex/s132_nrf52_6.1.0_softdevice.hex
+
+# Include the correct template Makefile depending on platform.
+TEMPLATE_PATH = $(SDK_ROOT)/components/toolchain/gcc
+ifeq ($(OS),Windows_NT)
+	include $(TEMPLATE_PATH)/Makefile.windows
+# The Windows command shell 'start' function is used so the executable
+# is started in its own window.
+	TERMINAL := cmd /c start ""
+	TERMINAL_END := 
+	NRFJPROG := nrfjprog.exe
+	GDBSERVER := JLinkGDBServerCL.exe
+	RTT_CLIENT := JLinkRTTClient.exe
+else
+	include $(TEMPLATE_PATH)/Makefile.posix
+	TERMINAL := st -e "
+	TERMINAL_END := "
+	NRFJPROG := nrfjprog
+	GDBSERVER := JLinkGDBServer
+	RTT_CLIENT := JLinkRTTClient
+endif
+
+# If multiple J-Links are attached to the computer then "SN=1234" can be used
+# to specify a serial number for GDB and flash targets. A random GDB port will
+# be generated so multiple targets can be debugged simultaneously.
+GDB_PORT := 2331
+ifdef SN
+	NRFJPROG_SN := --snr $(SN)
+	GDB_SERVER_SN := -select usb=$(SN)
+	GDB_PORT := $(shell awk 'BEGIN{srand();printf("%4.4s", 1000+9999*rand())}')
+endif
+
+GDB := $(GNU_INSTALL_ROOT)/$(GNU_PREFIX)-gdb
 
 $(OUTPUT_DIRECTORY)/nrf52832_xxaa.out: \
   LINKER_SCRIPT  := moisture_sensor_gcc_nrf52.ld
@@ -218,7 +272,7 @@ CFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
 CFLAGS += -ffunction-sections -fdata-sections -fno-strict-aliasing
 CFLAGS += -fno-builtin -fshort-enums
 # annoying warnings
-CFLAGS += -Wno-missing-braces -Wno-implicit-function-declaration
+CFLAGS += -Wno-missing-braces -Wno-implicit-function-declaration -Wno-maybe-uninitialized
 
 # C++ flags common to all targets
 CXXFLAGS += $(OPT)
@@ -295,6 +349,40 @@ flash_softdevice:
 
 erase:
 	nrfjprog -f nrf52 --eraseall
+
+.PHONY: gdb_cmd_file
+gdb_cmd_file: default
+	@echo "target remote localhost:$(GDB_PORT)" > $(GDB_CMD_PATH)
+	@echo "mon speed 10000" >> $(GDB_CMD_PATH)
+	@echo "mon flash download=1" >> $(GDB_CMD_PATH)
+	@echo "load $(DBG_BUILD_DIR)/$(TARGETS).out" >> $(GDB_CMD_PATH)
+	@echo "break main" >> $(GDB_CMD_PATH)
+	@echo "mon reset 0" >> $(GDB_CMD_PATH)
+	@echo "c" >> $(GDB_CMD_PATH)
+
+.PHONY: gdb_mon_cmd_file
+gdb_mon_cmd_file: gdb_cmd_file
+	@echo "mon exec SetMonModeDebug=1" >> $(GDB_CMD_PATH)
+	@echo "mon exec SetMonModeVTableAddr=$(JLINK_MON_DEBUG_APP_FLASH_LOCATION)" >> $(GDB_CMD_PATH)
+
+.PHONY: gdb_cli
+gdb_cli:
+	@st -e JLinkGDBServer $(GDB_SERVER_SN) -device nrf52832_XXAA -if swd -port $(GDB_PORT) &
+	@st -e $(GDB) $(DBG_BUILD_DIR)/$(TARGETS).out -x $(GDB_CMD_PATH)
+
+
+.PHONY: gdb
+gdb: gdb_cmd_file gdb_cli
+
+.PHONY: gdb_mon
+gdb_mon: gdb_mon_cmd_file gdb_cli
+
+.PHONY: gdb_rtt
+gdb_rtt: gdb rtt
+
+.PHONY: gdb_mon_rtt
+gdb_mon_rtt: gdb_mon rtt
+
 
 SDK_CONFIG_FILE := ../config/sdk_config.h
 CMSIS_CONFIG_TOOL := $(SDK_ROOT)/external_tools/cmsisconfig/CMSIS_Configuration_Wizard.jar
