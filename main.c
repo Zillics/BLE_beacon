@@ -77,6 +77,9 @@
 // Services
 #include "moisture_service.h"
 
+// 
+#include "circular_buffer.h"
+
 #define SAMPLES_IN_BUFFER 1
 
 #define APP_BLE_CONN_CFG_TAG            1                                  /**< A tag identifying the SoftDevice BLE configuration. */
@@ -103,10 +106,9 @@
 #define UICR_ADDRESS                    0x10001080                         /**< Address of the UICR register used by this example. The major and minor versions to be encoded into the advertising data will be picked up from this location. */
 #endif
 
-
-// Macros for capacitive sensing START
-
-#define APP_TIMER_TICKS_TIMEOUT APP_TIMER_TICKS(3000)
+// Capacitive sensing
+#define WAKEUP_INTERVAL         5000 // How often to wake up and take measurements
+#define APP_TIMER_TICKS_TIMEOUT APP_TIMER_TICKS(WAKEUP_INTERVAL)
 #define AIN_1                   1
 #define AIN_2                   2
 #define AIN_7                   7
@@ -115,7 +117,8 @@
 /** Pin on which to generate voltage for charging the capacitors used for measuring capacitance */
 #define CHARGE_OUTPUT_PIN 26
 
-// Macros for capacitive sensing END
+#define MOISTURE_DATA_LENGTH 2
+#define MOISTURE_DATA_BUFFER_LENGTH 50
 
 static ble_gap_adv_params_t m_adv_params;                                  /**< Parameters to be passed to the stack when starting advertising. */
 static uint8_t              m_adv_handle = BLE_GAP_ADV_SET_HANDLE_NOT_SET; /**< Advertising handle used to identify an advertising set. */
@@ -137,7 +140,9 @@ static ble_gap_adv_data_t m_adv_data =
   }
 };
 
-#define MOISTURE_DATA_LENGTH 2
+static circular_buffer_t m_moisture_buffer;
+static uint16_t m_moisture_running_average = 1700;
+static uint16_t m_moisture_reading = 0;
 static uint8_t m_moisture_level[MOISTURE_DATA_LENGTH] = 
 {
   0x00,
@@ -149,6 +154,32 @@ static void convert16to8(uint16_t src, uint8_t * dest)
 {
   dest[0] = (uint8_t) (src);
   dest[1] = (uint8_t) (src >> 8);
+}
+
+
+// Handling of moisture data
+
+uint16_t running_average(uint16_t prev_avg, uint16_t new_val, uint16_t N) {
+  float avg = (float) prev_avg + (1.0 / (float)N) * ((float)new_val - prev_avg);
+  return (uint16_t)avg;
+}
+
+void moisture_measurements_init(void) {
+  uint16_t init_value = 1700;
+  reset(&m_moisture_buffer, init_value);
+  m_moisture_running_average = init_value;
+}
+
+void update_moisture(uint16_t val) {
+  uint16_t N = length(&m_moisture_buffer);
+  m_moisture_reading = val;
+  m_moisture_running_average = running_average(m_moisture_running_average, val, N);
+  push_back(&m_moisture_buffer, val);
+}
+
+bool too_dry(void) {
+  return true;
+  //return m_moisture_running_average < 1600;
 }
 
 /**@brief Callback function for asserts in the SoftDevice.
@@ -262,55 +293,44 @@ static void timers_init(void)
 */
 static void power_management_init(void)
 {
+  // Enable internal DCDC regulator (instead of default LDO)
+  sd_power_dcdc_mode_set(NRF_POWER_DCDC_ENABLE);
+  // Set sub power mode to "low power"
+  sd_power_mode_set(NRF_POWER_MODE_LOWPWR);
+
   ret_code_t err_code;
   err_code = nrf_pwr_mgmt_init();
   APP_ERROR_CHECK(err_code);
+
 }
 
-
-/**
- * @brief Customized error handler
- */
 
 // Capacitive sensing START
 
-
-static void csense_timeout_handler(void * p_context)
-{
-  ret_code_t err_code;
-
-  err_code = nrf_drv_csense_sample();
-  if (err_code != NRF_SUCCESS)
-  {
-    return;
-  }
+static void test_advertise_handler(void * p_context) {
+  advertising_init();
+  advertising_start();
 }
 
-void start_app_timer(void)
-{
-  ret_code_t err_code;
-
-  /* APP_TIMER definition for csense example. */
-  APP_TIMER_DEF(timer_0);
-
-  err_code = app_timer_create(&timer_0, APP_TIMER_MODE_REPEATED, csense_timeout_handler);
-  APP_ERROR_CHECK(err_code);
-
-  err_code = app_timer_start(timer_0, APP_TIMER_TICKS_TIMEOUT, NULL);
-  APP_ERROR_CHECK(err_code);
+void csense_uninitialize(void) {
+  nrf_drv_csense_channels_disable(CAP_PAD_MASK);
+  nrf_drv_csense_uninit();
 }
 
-
-
-
+/** Handler for all csense events. */
 void csense_handler(nrf_drv_csense_evt_t * p_event_struct)
 {
   switch (p_event_struct->analog_channel)
   {
     case ELECTRODE_PIN:
-      convert16to8(p_event_struct->read_value, m_moisture_level);
-      advertising_init();
-      advertising_start();
+      update_moisture(p_event_struct->read_value);
+      csense_uninitialize();
+      if(too_dry()) {
+        //convert16to8(m_moisture_running_average, m_moisture_level);
+        convert16to8(m_moisture_reading, m_moisture_level);
+        advertising_init();
+        advertising_start();
+      }
       break;
 
     default:
@@ -328,22 +348,46 @@ void csense_initialize(void)
 
   err_code = nrf_drv_csense_init(&csense_config, csense_handler);
   APP_ERROR_CHECK(err_code);
-
   nrf_drv_csense_channels_enable(CAP_PAD_MASK);
 }
 
-// Capacitive sensing END
+static void csense_timeout_handler(void * p_context)
+{
+  csense_initialize();
+  ret_code_t err_code;
+  err_code = nrf_drv_csense_sample();
+  if (err_code != NRF_SUCCESS)
+  {
+    return;
+  }
+}
 
+void start_app_timer(void)
+{
+  ret_code_t err_code;
+
+  APP_TIMER_DEF(timer_0);
+
+  err_code = app_timer_create(&timer_0, APP_TIMER_MODE_REPEATED, csense_timeout_handler);
+  APP_ERROR_CHECK(err_code);
+
+  err_code = app_timer_start(timer_0, APP_TIMER_TICKS_TIMEOUT, NULL);
+  APP_ERROR_CHECK(err_code);
+}
+
+
+
+// Capacitive sensing END
 
 /**
  * @brief Function for application main entry.
  */
 int main(void)
 {
+  moisture_measurements_init();
   timers_init();
   power_management_init();
   ble_stack_init();
-  csense_initialize();
   start_app_timer();
   while (1)
   {
