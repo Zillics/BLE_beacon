@@ -107,7 +107,7 @@
 #endif
 
 // Capacitive sensing
-#define WAKEUP_INTERVAL         20000 // How often to wake up and take measurements
+#define WAKEUP_INTERVAL         5000 // How often to wake up and take measurements
 #define APP_TIMER_TICKS_TIMEOUT APP_TIMER_TICKS(WAKEUP_INTERVAL)
 #define AIN_1                   1
 #define AIN_2                   2
@@ -307,32 +307,15 @@ static void power_management_init(void)
 
 // Capacitive sensing START
 
-
-static void csense_timeout_handler(void * p_context)
-{
-  ret_code_t err_code;
-
-  err_code = nrf_drv_csense_sample();
-  if (err_code != NRF_SUCCESS)
-  {
-    return;
-  }
+static void test_advertise_handler(void * p_context) {
+  advertising_init();
+  advertising_start();
 }
 
-void start_app_timer(void)
-{
-  ret_code_t err_code;
-
-  APP_TIMER_DEF(timer_0);
-
-  err_code = app_timer_create(&timer_0, APP_TIMER_MODE_REPEATED, csense_timeout_handler);
-  APP_ERROR_CHECK(err_code);
-
-  err_code = app_timer_start(timer_0, APP_TIMER_TICKS_TIMEOUT, NULL);
-  APP_ERROR_CHECK(err_code);
+void csense_uninitialize(void) {
+  nrf_drv_csense_channels_disable(CAP_PAD_MASK);
+  nrf_drv_csense_uninit();
 }
-
-
 
 /** Handler for all csense events. */
 void csense_handler(nrf_drv_csense_evt_t * p_event_struct)
@@ -341,6 +324,7 @@ void csense_handler(nrf_drv_csense_evt_t * p_event_struct)
   {
     case ELECTRODE_PIN:
       update_moisture(p_event_struct->read_value);
+      csense_uninitialize();
       if(too_dry()) {
         //convert16to8(m_moisture_running_average, m_moisture_level);
         convert16to8(m_moisture_reading, m_moisture_level);
@@ -364,9 +348,34 @@ void csense_initialize(void)
 
   err_code = nrf_drv_csense_init(&csense_config, csense_handler);
   APP_ERROR_CHECK(err_code);
-
   nrf_drv_csense_channels_enable(CAP_PAD_MASK);
 }
+
+static void csense_timeout_handler(void * p_context)
+{
+  csense_initialize();
+  ret_code_t err_code;
+  err_code = nrf_drv_csense_sample();
+  if (err_code != NRF_SUCCESS)
+  {
+    return;
+  }
+}
+
+void start_app_timer(void)
+{
+  ret_code_t err_code;
+
+  APP_TIMER_DEF(timer_0);
+
+  err_code = app_timer_create(&timer_0, APP_TIMER_MODE_REPEATED, csense_timeout_handler);
+  APP_ERROR_CHECK(err_code);
+
+  err_code = app_timer_start(timer_0, APP_TIMER_TICKS_TIMEOUT, NULL);
+  APP_ERROR_CHECK(err_code);
+}
+
+
 
 // Capacitive sensing END
 
@@ -379,7 +388,6 @@ int main(void)
   timers_init();
   power_management_init();
   ble_stack_init();
-  csense_initialize();
   start_app_timer();
   while (1)
   {
