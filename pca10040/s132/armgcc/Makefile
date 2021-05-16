@@ -6,6 +6,8 @@ SDK_ROOT := ../../../../../..
 PROJ_DIR := ../../..
 DBG_BUILD_DIR := ./_build
 
+SOFTDEVICE_VERSION := 7.2.0
+
 # JLINK_MON_DEBUG_DIR should point to the directory that contains the files
 # in JLINK_MON_DEBUG_FILES plus JLINK_MONITOR.h. If Monitor Mode Debugging is
 # not required then leave JLINK_MON_DEBUG_DIR empty.
@@ -25,7 +27,7 @@ JLINK_MON_DEBUG_FILES := JLINK_MONITOR.c JLINK_MONITOR_ISR_SES.s
 # instead of relying on .gdbinit (to avoid having to enable .gbdinit files).
 GDB_CMD_PATH := $(DBG_BUILD_DIR)/gdb.txt
 
-SD_HEX_PATH := $(SDK_ROOT)/components/softdevice/s132/hex/s132_nrf52_6.1.0_softdevice.hex
+SD_HEX_PATH := $(SDK_ROOT)/components/softdevice/s132/hex/s132_nrf52_$(SOFTDEVICE_VERSION)_softdevice.hex
 
 # Include the correct template Makefile depending on platform.
 TEMPLATE_PATH = $(SDK_ROOT)/components/toolchain/gcc
@@ -248,7 +250,7 @@ INC_FOLDERS += \
 LIB_FILES += \
 
 # Optimization flags
-OPT = -O3 -g3
+OPT = -g3 -O3# -O3
 # Uncomment the line below to enable link time optimization
 #OPT += -flto
 
@@ -272,7 +274,7 @@ CFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
 CFLAGS += -ffunction-sections -fdata-sections -fno-strict-aliasing
 CFLAGS += -fno-builtin -fshort-enums
 # annoying warnings
-CFLAGS += -Wno-missing-braces -Wno-implicit-function-declaration -Wno-maybe-uninitialized
+CFLAGS += -Wno-missing-braces -Wno-implicit-function-declaration -Wno-maybe-uninitialized -Wno-unused-function
 
 # C++ flags common to all targets
 CXXFLAGS += $(OPT)
@@ -343,8 +345,8 @@ flash: default
 
 # Flash softdevice
 flash_softdevice:
-	@echo Flashing: s132_nrf52_6.1.1_softdevice.hex
-	nrfjprog -f nrf52 --program $(SDK_ROOT)/components/softdevice/s132/hex/s132_nrf52_6.1.1_softdevice.hex --sectorerase
+	@echo Flashing: s132_nrf52_$(SOFTDEVICE_VERSION)_softdevice.hex
+	nrfjprog -f nrf52 --program $(SDK_ROOT)/components/softdevice/s132/hex/s132_nrf52_$(SOFTDEVICE_VERSION)_softdevice.hex --sectorerase
 	nrfjprog -f nrf52 --reset
 
 erase:

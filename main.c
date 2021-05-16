@@ -107,7 +107,7 @@
 #endif
 
 // Capacitive sensing
-#define WAKEUP_INTERVAL         5000 // How often to wake up and take measurements
+#define WAKEUP_INTERVAL         20000 // How often to wake up and take measurements
 #define APP_TIMER_TICKS_TIMEOUT APP_TIMER_TICKS(WAKEUP_INTERVAL)
 #define AIN_1                   1
 #define AIN_2                   2
@@ -142,6 +142,7 @@ static ble_gap_adv_data_t m_adv_data =
 
 static circular_buffer_t m_moisture_buffer;
 static uint16_t m_moisture_running_average = 1700;
+static uint16_t m_moisture_reading = 0;
 static uint8_t m_moisture_level[MOISTURE_DATA_LENGTH] = 
 {
   0x00,
@@ -171,12 +172,14 @@ void moisture_measurements_init(void) {
 
 void update_moisture(uint16_t val) {
   uint16_t N = length(&m_moisture_buffer);
+  m_moisture_reading = val;
   m_moisture_running_average = running_average(m_moisture_running_average, val, N);
   push_back(&m_moisture_buffer, val);
 }
 
 bool too_dry(void) {
-  return m_moisture_running_average < 1600;
+  return true;
+  //return m_moisture_running_average < 1600;
 }
 
 /**@brief Callback function for asserts in the SoftDevice.
@@ -290,9 +293,15 @@ static void timers_init(void)
 */
 static void power_management_init(void)
 {
+  // Enable internal DCDC regulator (instead of default LDO)
+  sd_power_dcdc_mode_set(NRF_POWER_DCDC_ENABLE);
+  // Set sub power mode to "low power"
+  sd_power_mode_set(NRF_POWER_MODE_LOWPWR);
+
   ret_code_t err_code;
   err_code = nrf_pwr_mgmt_init();
   APP_ERROR_CHECK(err_code);
+
 }
 
 
@@ -333,7 +342,8 @@ void csense_handler(nrf_drv_csense_evt_t * p_event_struct)
     case ELECTRODE_PIN:
       update_moisture(p_event_struct->read_value);
       if(too_dry()) {
-        convert16to8(m_moisture_running_average, m_moisture_level);
+        //convert16to8(m_moisture_running_average, m_moisture_level);
+        convert16to8(m_moisture_reading, m_moisture_level);
         advertising_init();
         advertising_start();
       }
